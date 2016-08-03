@@ -109,3 +109,9 @@ def maxima(cutoff, x, y, y2):
         if power[i-1] < power[i] and power[i] > power[i+1] and power[i] > cutoff:
             maxima = np.append(maxima, x[i])
     return maxima
+
+#function calculates and returns the residuals of a particular fit w.r.t. the data
+def residuals(JDp, JDs, mass_ratio, primary, secondary, parameters):
+    r = np.sqrt(sum((np.asarray(primary)-RV(JDp, mass_ratio, parameters)[0])**2)
+        +sum((np.asarray(secondary)-RV(JDs, mass_ratio, parameters)[1])**2))
+    return r

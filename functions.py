@@ -115,3 +115,9 @@ def residuals(JDp, JDs, mass_ratio, primary, secondary, parameters):
     r = np.sqrt(sum((np.asarray(primary)-RV(JDp, mass_ratio, parameters)[0])**2)
         +sum((np.asarray(secondary)-RV(JDs, mass_ratio, parameters)[1])**2))
     return r
+
+def constraints(parameters, lower, upper):
+    K, e, w, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5]
+    if  lower[0] < K < upper[0] and lower[1] < e < upper[1] and lower[2] < w < upper[2] and lower[3] < T < upper[3] and lower[4] < P < upper[4] and lower[5] < y < upper[5]:
+        return 0
+    return -np.inf

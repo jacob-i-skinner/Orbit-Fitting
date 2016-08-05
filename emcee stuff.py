@@ -74,17 +74,20 @@ def probability(initial_guess, mass_ratio, RVp, RVs):
 ndim, nwalkers = 6, 400
 
 #initialize walkers 
-pos = [initial_guess + 0.1*np.random.randn(ndim) for i in range(nwalkers)]
+position = [initial_guess + np.random.randn(ndim) for i in range(nwalkers)]
 
-#for j in range(0,5):
-#    for i in range(0, 199):
-#        pos[i][3] = np.linspace(JD[0], JD[-1], num = 200)[i]
-#    for i in range(0, 199):
-#        pos[i][4] = np.linspace(7.5, 17.5, num = 200)[i]
+#walkers distributed in gaussian ball around most likely parameter values
+for i in range(0, 199):
+    position[i][0] = initial_guess[0] + 10*np.random.randn(1) #K
+    position[i][1] = initial_guess[1] + 0.1*np.random.randn(1) #e
+    position[i][2] = initial_guess[2] + 1*np.random.randn(1) #w
+    position[i][3] = initial_guess[3] + 2*np.random.randn(1) #T
+    position[i][4] = initial_guess[4] + 1*np.random.randn(1) #P
+    position[i][5] = initial_guess[5] + 3*np.random.randn(1) #y
 
 #idea for improvement: initialize walkers with gaussian balls of varying sizes, depending on parameter
 sampler = emcee.EnsembleSampler(nwalkers, ndim, probability, args=(mass_ratio, RVp, RVs), threads = 4)
-sampler.run_mcmc(pos, 5000)
+sampler.run_mcmc(position, 5000)
 
 
 #create the corner plot

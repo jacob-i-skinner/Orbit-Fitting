@@ -1,41 +1,20 @@
 import numpy as np
-from scipy import stats
 from matplotlib import pyplot as plt
-from scipy.optimize import curve_fit
 from scipy.signal import lombscargle
-
+from scipy import stats
 
 def alteredRV(x, K, e, w, T, P, y): #function generates RV values plot from given parameters
-    check = 1
-    M = (2*np.pi/P)*(x-T) #Mean Anomaly is a function of time
-    E1 = M + e*np.sin(M) + ((e**2)*np.sin(2*M)/2) #Eccentric Anomaly is a function of Mean Anomaly
-    while True: #iteratively refines estimate of E1 from initial estimate
-        E0 = E1
-        M0 = E0 - e*np.sin(E0)
-        E1 = E0 +(M-M0)/(1-e*np.cos(E0))
-        if np.amax(E1-E0) < 1E-9 or check-np.amax(E1-E0) == 0:
-            break
-        else:
-            check = np.amax(E1-E0)
-    nu = 2*np.arctan(np.sqrt((1 + e)/(1 - e))*np.tan(E1/2)) #True Anomaly is a function of Eccentric anomaly
-    p = ((K)*(np.cos(nu+w) + (e*np.cos(w)))+y)
-    return p
-    
-def alteredNoERV(x, K, T, P, y): #function generates RV values plot from given parameters
-    check = 1
-    M = (2*np.pi/P)*(x-T) #Mean Anomaly is a function of time
-    E1 = M #Eccentric Anomaly is a function of Mean Anomaly
-    while True: #iteratively refines estimate of E1 from initial estimate
-        E0 = E1
-        M0 = E0
-        E1 = E0 +(M-M0)
-        if np.amax(E1-E0) < 1E-9 or check-np.amax(E1-E0) == 0:
-            break
-        else:
-            check = np.amax(E1-E0)
-    nu = 2*np.arctan(np.tan(E1/2)) #True Anomaly is a function of Eccentric anomaly
-    p = K*np.cos(nu)+y
-    return p
+        M = (2*np.pi/P)*(x-T) #Mean Anomaly is a function of time
+        E1 = M + e*np.sin(M) + ((e**2)*np.sin(2*M)/2) #Eccentric Anomaly is a function of Mean Anomaly
+        while True: #iteratively refines estimate of E1 from initial estimate
+            E0 = E1
+            M0 = E0 - e*np.sin(E0)
+            E1 = E0 +(M-M0)/(1-e*np.cos(E0))
+            if np.amax(E1-E0) < 1E-9:
+                break
+        nu = 2*np.arctan(np.sqrt((1 + e)/(1 - e))*np.tan(E1/2)) #True Anomaly is a function of Eccentric anomaly
+        p = ((K)*(np.cos(nu+w) + (e*np.cos(w)))+y)
+        return p
 
 def RV(x, mass_ratio, parameters): #function generates RV values plot from given parameters
     check = 1    
@@ -52,24 +31,6 @@ def RV(x, mass_ratio, parameters): #function generates RV values plot from given
             check = np.amax(E1-E0)
     nu = 2*np.arctan(np.sqrt((1 + e)/(1 - e))*np.tan(E1/2)) #True Anomaly is a function of Eccentric anomaly
     p, s = (K*(np.cos(nu+w) + (e*np.cos(w)))+y), ((-K/mass_ratio)*(np.cos(nu+w) + (e*np.cos(w)))+y)
-    return p, s
-
-#a version of the RV plotter that is used if e is sufficiently close to zero
-def noERV(x, mass_ratio, parameters): #function generates RV values plot from given parameters
-    check = 1    
-    K, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3]
-    M = (2*np.pi/P)*(x-T) #Mean Anomaly is a function of time
-    E1 = M #Eccentric Anomaly is a function of Mean Anomaly
-    while True: #iteratively refines estimate of E1 from initial estimate
-        E0    = E1
-        M0    = E0
-        E1    = E0 +(M-M0)
-        if np.amax(E1-E0) < 1E-9 or check-np.amax(E1-E0) == 0:
-            break
-        else:
-            check = np.amax(E1-E0)
-    nu = 2*np.arctan(np.tan(E1/2)) #True Anomaly is a function of Eccentric anomaly
-    p, s = K*np.cos(nu)+y, (-K/mass_ratio)*np.cos(nu)+y
     return p, s
 
 #This periodogram function was taken from Jake Vanderplas' article "Fast Lomb-Scargle Periodograms in Python"
@@ -116,6 +77,13 @@ def dataWindow(x, f, max_period):
     powers *= 2 / N
     return periods, powers
 
+#function computes and returns mass ratio and intercept
+#def massRatio():
+#    p =[datum[1] for datum in system if not np.isnan(datum[1]+datum[2])]
+#    s =[datum[2] for datum in system if not np.isnan(datum[1]+datum[2])]
+#    m,b = np.polyfit(s, p, 1)
+#    return -m, b
+
 #this function removes nan cells from the bad RV visits, and deletes the accompanying JD element 
 #from a copy tied to the specific rv list
 def adjustment(x, rv):
@@ -158,14 +126,6 @@ def maxima(cutoff, x, y, y2):
             maxima = np.append(maxima, x[i])
     return maxima
 
-#provides starting point for the MCMC
-def initialGuess(lower, upper, JDp, RVp):
-    return curve_fit(alteredRV, JDp, np.asarray(RVp), bounds=(lower, upper))[0]
-
-#provides starting point for the MCMC, with circular orbit
-def initialGuessNoE(lower, upper, JDp, RVp):
-    return curve_fit(alteredNoERV, JDp, np.asarray(RVp), bounds=(lower, upper))[0]
-
 #function calculates and returns the residuals of a particular fit w.r.t. the data
 def residuals(JDp, JDs, mass_ratio, primary, secondary, parameters):
     r = np.sqrt(sum((np.asarray(primary)-RV(JDp, mass_ratio, parameters)[0])**2)
@@ -175,11 +135,5 @@ def residuals(JDp, JDs, mass_ratio, primary, secondary, parameters):
 def constraints(parameters, lower, upper):
     K, e, w, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5]
     if  lower[0] < K < upper[0] and lower[1] < e < upper[1] and lower[2] < w < upper[2] and lower[3] < T < upper[3] and lower[4] < P < upper[4] and lower[5] < y < upper[5]:
-        return 0
-    return -np.inf
-
-def constraintsNoE(parameters, lower, upper):
-    K, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3]
-    if  lower[0] < K < upper[0] and lower[3] < T < upper[3] and lower[4] < P < upper[4] and lower[5] < y < upper[5]:
         return 0
     return -np.inf

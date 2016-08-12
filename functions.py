@@ -180,6 +180,6 @@ def constraints(parameters, lower, upper):
 
 def constraintsNoE(parameters, lower, upper):
     K, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3]
-    if  lower[0] < K < upper[0] and lower[3] < T < upper[3] and lower[4] < P < upper[4] and lower[5] < y < upper[5]:
+    if  lower[0] < K < upper[0] and lower[1] < T < upper[1] and lower[2] < P < upper[2] and lower[3] < y < upper[3]:
         return 0
     return -np.inf

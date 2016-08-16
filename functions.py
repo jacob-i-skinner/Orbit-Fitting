@@ -119,14 +119,11 @@ def dataWindow(x, f, max_period):
 #this function removes nan cells from the bad RV visits, and deletes the accompanying JD element 
 #from a copy tied to the specific rv list
 def adjustment(x, rv):
-    adjusted_x = np.asarray(x)
-    for i in range(0, len(x)-1):
-        if i == len(rv):
-            break
-        if np.isnan(rv[i]):
-            rv         = np.delete(rv, i)
-            adjusted_x = np.delete(adjusted_x, i)
-    return adjusted_x, rv
+    newJD, newRV = np.array([]), np.array([])
+    for i in range(len(np.where(np.isfinite(rv))[0])):
+        newJD = np.append(newJD, x[np.where(np.isfinite(rv))[0][i]])
+        newRV = np.append(newRV, rv[np.where(np.isfinite(rv))[0][i]])
+    return newJD, newRV
 
 #function converts measurements in time into measurements in orbital phase (from 0-1)
 #function is only useful after T and P have been determined

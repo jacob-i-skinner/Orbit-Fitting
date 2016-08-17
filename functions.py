@@ -37,7 +37,8 @@ def alteredNoERV(x, K, T, P, y): #function generates RV values plot from given p
     p = K*np.cos(nu)+y
     return p
 
-def RV(x, mass_ratio, parameters): #function generates RV values plot from given parameters
+#function generates RV values from given parameters
+def RV(x, mass_ratio, parameters):
     check = 1    
     K, e, w, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5]
     M = (2*np.pi/P)*(x-T) #Mean Anomaly is a function of time
@@ -136,7 +137,7 @@ def phases(P, T, times):
     return phased_Times
 
 #function calculates mass ratio and error of both the regression and the slope parameter
-def massRatio(x,y, system):
+def massRatio(x, y, system):
     y = [datum[1] for datum in system if not np.isnan(datum[1]+datum[2])] #primary component
     x = [datum[2] for datum in system if not np.isnan(datum[1]+datum[2])] #secondary
     slope, intercept, r_value, p_value, std_err = stats.linregress(x,y)

@@ -13,7 +13,7 @@ def alteredRV(x, K, e, w, T, P, y): #function generates RV values plot from give
         E0 = E1
         M0 = E0 - e*np.sin(E0)
         E1 = E0 +(M-M0)/(1-e*np.cos(E0))
-        if np.amax(E1-E0) < 1E-9 or check-np.amax(E1-E0) == 0:
+        if np.amax(E1-E0) < 1e-9 or check-np.amax(E1-E0) == 0:
             break
         else:
             check = np.amax(E1-E0)
@@ -29,7 +29,7 @@ def alteredNoERV(x, K, T, P, y): #function generates RV values plot from given p
         E0 = E1
         M0 = E0
         E1 = E0 +(M-M0)
-        if np.amax(E1-E0) < 1E-9 or check-np.amax(E1-E0) == 0:
+        if np.amax(E1-E0) < 1e-9 or check-np.amax(E1-E0) == 0:
             break
         else:
             check = np.amax(E1-E0)
@@ -47,7 +47,7 @@ def RV(x, mass_ratio, parameters):
         E0    = E1
         M0    = E0 - e*np.sin(E0)
         E1    = E0 +(M-M0)/(1-e*np.cos(E0))
-        if np.amax(E1-E0) < 1E-9 or check-np.amax(E1-E0) == 0:
+        if np.amax(E1-E0) < 1e-9 or check-np.amax(E1-E0) == 0:
             break
         else:
             check = np.amax(E1-E0)
@@ -65,7 +65,7 @@ def noERV(x, mass_ratio, parameters): #function generates RV values plot from gi
         E0    = E1
         M0    = E0
         E1    = E0 +(M-M0)
-        if np.amax(E1-E0) < 1E-9 or check-np.amax(E1-E0) == 0:
+        if np.amax(E1-E0) < 1e-9 or check-np.amax(E1-E0) == 0:
             break
         else:
             check = np.amax(E1-E0)
@@ -130,7 +130,7 @@ def adjustment(x, rv):
 #function is only useful after T and P have been determined
 def phases(P, T, times):
     phased_Times = np.array([])
-    for i in range(0, len(times)):
+    for i in range(len(times)):
         phased_Times = np.append(phased_Times, ((times[i])-T)/P-int(((times[i])-T)/P))
         if phased_Times[i] < 0:
             phased_Times[i] = phased_Times[i]+1

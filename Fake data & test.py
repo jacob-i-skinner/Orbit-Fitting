@@ -53,7 +53,7 @@ JDp, JDs     = JD, JD
 samples      = 10000
 max_period   = 9
 power_cutoff = 0.4
-ndim, nwalkers, nsteps = 6, 100, 1000
+ndim, nwalkers, nsteps = 6, 500, 10000
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
@@ -150,16 +150,16 @@ def probability(initial_guess, mass_ratio, RVp, RVs, lower, upper):
 position = [initial_guess + 0.1*np.random.randn(ndim) for i in range(nwalkers)]
 
 #walkers distributed in gaussian ball around most likely parameter values
-for i in range(0, nwalkers-1):
+for i in range(nwalkers):
     position[i][0] = initial_guess[0] + 5  *np.random.randn(1) #K
     position[i][1] = initial_guess[1] + 0.1*np.random.randn(1) #e
     position[i][2] = initial_guess[2] + 1  *np.random.randn(1) #w
-    position[i][3] = initial_guess[3] + 4  *np.random.randn(1) #T
+    position[i][3] = initial_guess[3] + 5  *np.random.randn(1) #T
     position[i][4] = initial_guess[4] + 0.1*np.random.randn(1) #P
     position[i][5] = initial_guess[5] + 3  *np.random.randn(1) #y
 
 #create the sampler object and do the walk
-sampler = emcee.EnsembleSampler(nwalkers, ndim, probability, a=4,
+sampler = emcee.EnsembleSampler(nwalkers, ndim, probability,
                                 args=(mass_ratio, RVp, RVs, lower_bounds, upper_bounds), threads = 4)
 sampler.run_mcmc(position, nsteps)
 
@@ -178,14 +178,14 @@ results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
 #fig.savefig("parameter_results.png")
 
 #create the walkers plot
-'''fig, ax = plt.subplots(ndim, 1, sharex='col')
+fig, ax = plt.subplots(ndim, 1, sharex='col')
 for i in range(ndim):
     for j in range(len(sampler.chain[:, 0, i])):
         ax[i].plot(np.linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.2)
     ax[i].plot(np.linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*initial_guess[i], 'r', lw=2)
     ax[i].plot(np.linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*parameters[i], 'b', lw=2)
 fig.set_figheight(20)
-fig.set_figwidth(15)'''
+fig.set_figwidth(15)
 #plt.savefig('walk_results.png')
 
 #create the curves plot
@@ -211,4 +211,4 @@ t = time.time()
 print('Completed in ', int((t-t0)/60), ' minutes and ', int(((t-t0)/60-int((t-t0)/60))*60), 'seconds.')
 for i in range(6):
     print(results[i][0], '+',results[i][1], '-',results[i][2])
-#plt.show()
+plt.show()

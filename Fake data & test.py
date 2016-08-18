@@ -34,16 +34,14 @@ def massRatio(x, y):
     sx2 = ((x-x_bar)**2).sum()
     slope_err = std_err * np.sqrt(1./sx2)
     return -slope, intercept, R2, std_err, slope_err
-
 #set true parameters
 mr = 0.6 #mass ratio
 x = np.array([2540, 2542, 2543, 2546, 2550, 2552, 2552.35, 2555, 2560, 2561, 2562, 2563, 2563.5, 2564, 2564.5, 2564.75, 2565])
 parameters = 50, 0.5, 1.3, 2554, 3, 15
 RVp, RVs = RV(x, mr, parameters)
 for i in range(len(RVp)):
-    RVp[i] = RVp[i] + 2*np.random.randn()
-    RVs[i] = RVs[i] + 2*np.random.randn()
-
+    RVp[i] = RVp[i] + np.random.randn()
+    RVs[i] = RVs[i] + np.random.randn()
 #fake the data
 
 
@@ -55,7 +53,7 @@ JDp, JDs     = JD, JD
 samples      = 10000
 max_period   = 9
 power_cutoff = 0.4
-ndim, nwalkers, nsteps = 6, 200, 1000
+ndim, nwalkers, nsteps = 6, 100, 1000
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
@@ -69,7 +67,7 @@ x, y = np.array([np.nanmin(RVs), np.nanmax(RVs)]),-mass_ratio*np.array([np.nanmi
 ax.plot(x, y)
 ax.set_ylabel('Primary Velocity', size='15')
 ax.set_xlabel('Secondary Velocity', size='15')'''
-print('mass ratio is ', mass_ratio, "+/-", slope_error)
+print('mass ratio is ', mass_ratio, "+/-", standard_error)
 
 #check RV measurements for the need to be adjusted and adjust them if so
 JDp, RVp = adjustment(JD, RVp)
@@ -171,27 +169,27 @@ results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                               zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
 
 #create the corner plot
-fig = corner.corner(samples, labels=["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"],
+'''fig = corner.corner(samples, labels=["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"],
                     extents=[[lower_bounds[0], upper_bounds[0]], [lower_bounds[1],upper_bounds[1]],
                              [lower_bounds[2], upper_bounds[2]],
                              [lower_bounds[3], upper_bounds[3]], [lower_bounds[4], upper_bounds[4]],
                              [lower_bounds[5], upper_bounds[5]]],
-                    quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 18})
+                    quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 18})'''
 #fig.savefig("parameter_results.png")
 
 #create the walkers plot
-fig, ax = plt.subplots(ndim, 1, sharex='col')
+'''fig, ax = plt.subplots(ndim, 1, sharex='col')
 for i in range(ndim):
     for j in range(len(sampler.chain[:, 0, i])):
         ax[i].plot(np.linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.2)
     ax[i].plot(np.linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*initial_guess[i], 'r', lw=2)
     ax[i].plot(np.linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*parameters[i], 'b', lw=2)
 fig.set_figheight(20)
-fig.set_figwidth(15)
+fig.set_figwidth(15)'''
 #plt.savefig('walk_results.png')
 
 #create the curves plot
-x = np.linspace(0, 15.8, num=nsteps)
+'''x = np.linspace(0, 15.8, num=nsteps)
 fig, ax = plt.figure(figsize=(15,8)), plt.subplot(111)
 #commented out section shows a sampling of curves from the walk
 #for K, e, w, T, P, y in samples[np.random.randint(len(samples), size=250)]:
@@ -206,9 +204,11 @@ ax.plot(x/results[4][0], secondary, 'r', lw=2)
 ax.plot(x, np.ones(len(x))*results[5][0], 'k' , label='Systemic Velocity')
 ax.plot(phases(results[4][0], results[3][0], JDp), RVp, 'bs', label='Primary RV Data') #data phased to result period
 ax.plot(phases(results[4][0], results[3][0], JDs), RVs, 'rs', label='Secondary RV data')
-ax.set_xlim([0,1])
+ax.set_xlim([0,1])'''
 #plt.savefig('curve_results.png')
         
 t = time.time()
 print('Completed in ', int((t-t0)/60), ' minutes and ', int(((t-t0)/60-int((t-t0)/60))*60), 'seconds.')
-plt.show()
+for i in range(6):
+    print(results[i][0], '+',results[i][1], '-',results[i][2])
+#plt.show()

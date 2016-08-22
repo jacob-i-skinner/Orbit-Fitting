@@ -16,7 +16,7 @@ JDp, JDs     = JD, JD
 samples      = 1000
 max_period   = 9
 power_cutoff = 0.7
-ndim, nwalkers, nsteps = 6, 200, 1000
+ndim, nwalkers, nsteps = 6, 400, 10000
 
 #define-functions------------------------------------------------------------------------------------------------#
 
@@ -48,9 +48,10 @@ x, y = np.array([np.nanmin(RVs), np.nanmax(RVs)]),-mass_ratio*np.array([np.nanmi
 ax.plot(x, y)
 ax.set_ylabel('Primary Velocity', size='15')
 ax.set_xlabel('Secondary Velocity', size='15')
-print('mass ratio is ', mass_ratio, "+/-", slope_error)
+plt.savefig(filename + ' mass ratio.png')
+print('mass ratio is ', mass_ratio, "+/-", standard_error)
 
-#check RV measurements for the need to be adjusted and adjust them if so
+#check for invalid values
 JDp, RVp = adjustment(JD, RVp)
 JDs, RVs = adjustment(JD, RVs)
 
@@ -80,8 +81,8 @@ ax6.set_xlabel('Period (days)', size='15')
 ax2.set_ylabel('Normalized Lomb-Scargle Power', size='20')
 fig.set_figheight(10)
 fig.set_figwidth(15)
-#plt.savefig(filename + ' periodogram.pdf')
-print('Periodogram peaks above a power of 0.25:', maxima(power_cutoff, x, y, y2))
+plt.savefig(filename + ' periodogram.png')
+print('Periodogram peaks above a power of 0.7:', maxima(power_cutoff, x, y, y2))
 
 #plot periodogram - data window
 fig = plt.figure(figsize=(8,3))
@@ -95,12 +96,12 @@ ax.set_title('')
 #plot phased RVs
 fig = plt.figure(figsize=(8,3))
 ax = plt.subplot(111)
-ax.plot(phases(maxima(power_cutoff, x, y, y2)[-1], 0, JDp), RVp, 'k.')
-ax.plot(phases(maxima(power_cutoff, x, y, y2)[-1], 0, JDs), RVs, 'r.')
+ax.plot(phases(maxima(power_cutoff, x, y, y2)[-1], JDp), RVp, 'k.')
+ax.plot(phases(maxima(power_cutoff, x, y, y2)[-1], JDs), RVs, 'r.')
 ax.set_title('')
 ax.set_xlabel('Orbital Phase', size='15')
 ax.set_ylabel('Radial Velocity', size='20')
-#plt.savefig(filename + ' RV-phase diagram.pdf')
+plt.savefig(filename + ' RV-phase diagram.png')
 
 #-----------------------MCMC------------------------#
 
@@ -132,7 +133,7 @@ position = [initial_guess + 0.1*np.random.randn(ndim) for i in range(nwalkers)]
 
 #walkers distributed in gaussian ball around most likely parameter values
 for i in range(0, nwalkers-1):
-    position[i][0] = initial_guess[0] + 2.5*np.random.randn(1) #K
+    position[i][0] = initial_guess[0] + 5  *np.random.randn(1) #K
     position[i][1] = initial_guess[1] + 0.1*np.random.randn(1) #e
     position[i][2] = initial_guess[2] + 1  *np.random.randn(1) #w
     position[i][3] = initial_guess[3] +     np.random.randn(1) #T
@@ -156,7 +157,7 @@ fig = corner.corner(samples, labels=["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\
                              [lower_bounds[3], upper_bounds[3]], [lower_bounds[4], upper_bounds[4]],
                              [lower_bounds[5], upper_bounds[5]]],
                     quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 18})
-#fig.savefig("parameter_results.png")
+fig.savefig(filename + "parameter_results.png")
 
 #create the walkers plot
 fig, ax = plt.subplots(ndim, 1, sharex='col')
@@ -166,7 +167,7 @@ for i in range(ndim):
     ax[i].plot(np.linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*initial_guess[i], 'r', lw=2)
 fig.set_figheight(20)
 fig.set_figwidth(15)
-#plt.savefig('walk_results.png')
+plt.savefig(filename + 'walk_results.png')
 
 #create the curves plot
 x = np.linspace(0, 15.8, num=nsteps)
@@ -182,11 +183,14 @@ primary, secondary = RV(x, mass_ratio, [results[0][0], results[1][0], results[2]
 ax.plot(x/results[4][0], primary, 'b', lw=2)
 ax.plot(x/results[4][0], secondary, 'r', lw=2)
 ax.plot(x, np.ones(len(x))*results[5][0], 'k' , label='Systemic Velocity')
-ax.plot(phases(results[4][0], results[3][0], JDp), RVp, 'bs', label='Primary RV Data') #data phased to result period
-ax.plot(phases(results[4][0], results[3][0], JDs), RVs, 'rs', label='Secondary RV data')
+ax.plot(phases(results[4][0], JDp), RVp, 'bs', label='Primary RV Data') #data phased to result period
+ax.plot(phases(results[4][0], JDs), RVs, 'rs', label='Secondary RV data')
 ax.set_xlim([0,1])
-#plt.savefig('curve_results.png')
+plt.savefig(filename + 'curve_results.png')
 
+print('Results:')
+for i in range(6):
+    print(results[i][0], '+',results[i][1], '-',results[i][2])
 t = time.time()
 print('Completed in ', int((t-t0)/60), ' minutes and ', int(((t-t0)/60-int((t-t0)/60))*60), 'seconds.')
 
@@ -242,7 +246,7 @@ fig = corner.corner(samples, labels=["$K$", "$T$", "$P$", "$\gamma$"],
                     extents=[[lower_bounds[0], upper_bounds[0]], [lower_bounds[1],upper_bounds[1]],
                              [lower_bounds[2], upper_bounds[2]], [lower_bounds[3], upper_bounds[3]]],
                     quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 18})
-#plt.savefig('parameter_results.png')
+plt.savefig(filename + 'no e parameter_results.png')
 
 #create the walkers plot
 fig, ax = plt.subplots(ndim, 1, sharex='col')
@@ -252,26 +256,22 @@ for i in range(ndim):
     ax[i].plot(np.linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*initial_guess[i], 'r')
 fig.set_figheight(20)
 fig.set_figwidth(15)
-#plt.savefig('walk_results.png')
+plt.savefig(filename + 'no e walk_results.png')
 
 #create the curves plot
 x = np.linspace(0, 15.8, num=nsteps)
 fig, ax = plt.figure(figsize=(15,8)), plt.subplot(111)
-#commented out section shows a sampling of curves from the walk
-#for K, e, w, T, P, y in samples[np.random.randint(len(samples), size=250)]:
-#    parameters = K, e, w, T, P, y
-#    primary, secondary = RV(x, mass_ratio, parameters)
-#    ax.plot(x/parameters[4], primary, 'c', label='Potential Primary Curves', alpha=0.2)
-#    ax.plot(x/parameters[4], secondary, 'm', label='Potential Secondary Curves', alpha=0.2)
 primary, secondary = noERV(x, mass_ratio, [results[0][0], results[1][0], results[2][0], results[3][0]])
 ax.plot(x/results[2][0], primary, 'b', lw=2)
 ax.plot(x/results[2][0], secondary, 'r', lw=2)
 ax.plot(x, np.ones(len(x))*results[3][0], 'k' , label='Systemic Velocity')
-ax.plot(phases(results[2][0], results[1][0], JDp), RVp, 'bs', label='Primary RV Data') #data phased to result period
-ax.plot(phases(results[2][0], results[1][0], JDs), RVs, 'rs', label='Secondary RV data')
+ax.plot(phases(results[2][0], JDp), RVp, 'bs', label='Primary RV Data') #data phased to result period
+ax.plot(phases(results[2][0], JDs), RVs, 'rs', label='Secondary RV data')
 ax.set_xlim([0,1])
-#plt.savefig('curve_results.png')
+plt.savefig(filename + 'no e curve_results.png')
 
+print('Results:')
+for i in range(6):
+    print(results[i][0], '+',results[i][1], '-',results[i][2])
 t = time.time()
-plt.show()
 print('Completed in ', int((t-t0)/60), ' minutes and ', int(((t-t0)/60-int((t-t0)/60))*60), 'seconds.')

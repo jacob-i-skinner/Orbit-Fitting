@@ -53,7 +53,7 @@ JDp, JDs     = JD, JD
 samples      = 10000
 max_period   = 9
 power_cutoff = 0.4
-ndim, nwalkers, nsteps = 6, 500, 10000
+ndim, nwalkers, nsteps = 6, 400, 5000
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
@@ -151,7 +151,7 @@ position = [initial_guess + 0.1*np.random.randn(ndim) for i in range(nwalkers)]
 
 #walkers distributed in gaussian ball around most likely parameter values
 for i in range(nwalkers):
-    position[i][0] = initial_guess[0] + 5  *np.random.randn(1) #K
+    position[i][0] = initial_guess[0] + 2.5*np.random.randn(1) #K
     position[i][1] = initial_guess[1] + 0.1*np.random.randn(1) #e
     position[i][2] = initial_guess[2] + 1  *np.random.randn(1) #w
     position[i][3] = initial_guess[3] + 5  *np.random.randn(1) #T
@@ -189,7 +189,7 @@ fig.set_figwidth(15)
 #plt.savefig('walk_results.png')
 
 #create the curves plot
-'''x = np.linspace(0, 15.8, num=nsteps)
+x = np.linspace(0, 15.8, num=nsteps)
 fig, ax = plt.figure(figsize=(15,8)), plt.subplot(111)
 #commented out section shows a sampling of curves from the walk
 #for K, e, w, T, P, y in samples[np.random.randint(len(samples), size=250)]:
@@ -202,11 +202,12 @@ primary, secondary = RV(x, mass_ratio, [results[0][0], results[1][0], results[2]
 ax.plot(x/results[4][0], primary, 'b', lw=2)
 ax.plot(x/results[4][0], secondary, 'r', lw=2)
 ax.plot(x, np.ones(len(x))*results[5][0], 'k' , label='Systemic Velocity')
-ax.plot(phases(results[4][0], results[3][0], JDp), RVp, 'bs', label='Primary RV Data') #data phased to result period
-ax.plot(phases(results[4][0], results[3][0], JDs), RVs, 'rs', label='Secondary RV data')
-ax.set_xlim([0,1])'''
+ax.plot(phases(results[4][0], JDp), RVp, 'bs', label='Primary RV Data') #data phased to result period
+ax.plot(phases(results[4][0], JDs), RVs, 'rs', label='Secondary RV data')
+ax.set_xlim([0,1])
+
 #plt.savefig('curve_results.png')
-        
+
 t = time.time()
 print('Completed in ', int((t-t0)/60), ' minutes and ', int(((t-t0)/60-int((t-t0)/60))*60), 'seconds.')
 for i in range(6):

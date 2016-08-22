@@ -128,10 +128,10 @@ def adjustment(x, rv):
 
 #function converts measurements in time into measurements in orbital phase (from 0-1)
 #function is only useful after T and P have been determined
-def phases(P, T, times):
+def phases(P, times):
     phased_Times = np.array([])
     for i in range(len(times)):
-        phased_Times = np.append(phased_Times, ((times[i])-T)/P-int(((times[i])-T)/P))
+        phased_Times = np.append(phased_Times, times[i]/P-int(times[i]/P))
         if phased_Times[i] < 0:
             phased_Times[i] = phased_Times[i]+1
     return phased_Times

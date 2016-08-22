@@ -39,18 +39,18 @@ def alteredNoERV(x, K, T, P, y): #function generates RV values plot from given p
 
 #function generates RV values from given parameters
 def RV(x, mass_ratio, parameters):
-    check = 1    
+#    check = 1    
     K, e, w, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5]
     M = (2*np.pi/P)*(x-T) #Mean Anomaly is a function of time
     E1 = M + e*np.sin(M) + ((e**2)*np.sin(2*M)/2) #Eccentric Anomaly is a function of Mean Anomaly
-    while True: #iteratively refines estimate of E1 from initial estimate
-        E0    = E1
-        M0    = E0 - e*np.sin(E0)
-        E1    = E0 +(M-M0)/(1-e*np.cos(E0))
-        if np.amax(E1-E0) < 1e-9 or check-np.amax(E1-E0) == 0:
-            break
-        else:
-            check = np.amax(E1-E0)
+#    while True: #iteratively refines estimate of E1 from initial estimate
+#        E0    = E1
+#        M0    = E0 - e*np.sin(E0)
+#        E1    = E0 +(M-M0)/(1-e*np.cos(E0))
+#        if np.amax(E1-E0) < 1e-9 or check-np.amax(E1-E0) == 0:
+#            break
+#        else:
+#            check = np.amax(E1-E0)
     nu = 2*np.arctan(np.sqrt((1 + e)/(1 - e))*np.tan(E1/2)) #True Anomaly is a function of Eccentric anomaly
     p, s = (K*(np.cos(nu+w) + (e*np.cos(w)))+y), ((-K/mass_ratio)*(np.cos(nu+w) + (e*np.cos(w)))+y)
     return p, s

@@ -16,7 +16,7 @@ JDp, JDs     = JD, JD
 samples      = 1000
 max_period   = 9
 power_cutoff = 0.7
-ndim, nwalkers, nsteps = 6, 400, 10000
+ndim, nwalkers, nsteps = 6, 50, 500
 
 #define-functions------------------------------------------------------------------------------------------------#
 
@@ -29,10 +29,8 @@ adjustment     = f.adjustment
 RV             = f.RV
 residuals      = f.residuals
 constraints    = f.constraints
-constraintsNoE = f.constraintsNoE
 alteredRV      = f.alteredRV
 initialGuess   = f.initialGuess
-noERV          = f.noERV
 alteredNoERV   = f.alteredNoERV
 initialGuessNoE= f.initialGuessNoE
 
@@ -142,7 +140,7 @@ for i in range(0, nwalkers-1):
 
 #create the sampler object and take a walk
 sampler = emcee.EnsembleSampler(nwalkers, ndim, probability,
-                                args=(mass_ratio, RVp, RVs, lower_bounds, upper_bounds), threads = 4)
+                                args=(mass_ratio, RVp, RVs, lower_bounds, upper_bounds))
 sampler.run_mcmc(position, nsteps)
 
 #save the results of the walk
@@ -207,14 +205,14 @@ del lower_bounds[1:3], upper_bounds[1:3]
 initial_guess = initialGuessNoE(lower_bounds, upper_bounds, JDp, RVp)
 
 def likelihood(parameters, mass_ratio, primary, secondary):
-    r = np.sqrt(sum((np.asarray(primary)-noERV(JDp, mass_ratio, parameters)[0])**2)
-        +sum((np.asarray(secondary)-noERV(JDs, mass_ratio, parameters)[1])**2))
+    r = np.sqrt(sum((np.asarray(primary)-RV(JDp, mass_ratio, parameters)[0])**2)
+        +sum((np.asarray(secondary)-RV(JDs, mass_ratio, parameters)[1])**2))
     return -r
 
 #function is poorly named, returns the negative infinity if parameters lie outside contraints, otherwise
 #returns the output from residuals()
 def probability(initial_guess, mass_ratio, RVp, RVs, lower, upper):
-    con = constraintsNoE(initial_guess, lower, upper)
+    con = constraints(initial_guess, lower, upper)
     if not np.isfinite(con):
         return -np.inf
     return con + likelihood(initial_guess, mass_ratio, RVp, RVs)
@@ -231,7 +229,7 @@ for i in range(nwalkers):
 
 #create the sampler object and do the walk
 sampler = emcee.EnsembleSampler(nwalkers, ndim, probability,
-                                args=(mass_ratio, RVp, RVs, lower_bounds, upper_bounds), threads = 4)
+                                args=(mass_ratio, RVp, RVs, lower_bounds, upper_bounds))
 sampler.run_mcmc(position, nsteps)
 
 #save the results of the walk
@@ -261,7 +259,7 @@ plt.savefig(filename + 'no e walk_results.png')
 #create the curves plot
 x = np.linspace(0, 15.8, num=nsteps)
 fig, ax = plt.figure(figsize=(15,8)), plt.subplot(111)
-primary, secondary = noERV(x, mass_ratio, [results[0][0], results[1][0], results[2][0], results[3][0]])
+primary, secondary = RV(x, mass_ratio, [results[0][0], results[1][0], results[2][0], results[3][0]])
 ax.plot(x/results[2][0], primary, 'b', lw=2)
 ax.plot(x/results[2][0], secondary, 'r', lw=2)
 ax.plot(x, np.ones(len(x))*results[3][0], 'k' , label='Systemic Velocity')

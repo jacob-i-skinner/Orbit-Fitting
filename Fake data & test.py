@@ -22,7 +22,6 @@ constraints    = f.constraints
 constraintsNoE = f.constraintsNoE
 alteredRV      = f.alteredRV
 initialGuess   = f.initialGuess
-noERV          = f.noERV
 alteredNoERV   = f.alteredNoERV
 initialGuessNoE= f.initialGuessNoE
 

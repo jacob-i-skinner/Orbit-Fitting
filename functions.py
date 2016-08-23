@@ -4,28 +4,6 @@ from matplotlib import pyplot as plt
 from scipy.optimize import curve_fit
 from scipy.signal import lombscargle
 
-
-def alteredRV(x, K, e, w, T, P, y): #function generates RV values plot from given parameters
-    check = 1
-    M = (2*np.pi/P)*(x-T) #Mean Anomaly is a function of time
-    E1 = M + e*np.sin(M) + ((e**2)*np.sin(2*M)/2) #Eccentric Anomaly is a function of Mean Anomaly
-    while True: #iteratively refines estimate of E1 from initial estimate
-        E0 = E1
-        M0 = E0 - e*np.sin(E0)
-        E1 = E0 +(M-M0)/(1-e*np.cos(E0))
-        if np.amax(E1-E0) < 1e-9 or check-np.amax(E1-E0) == 0:
-            break
-        else:
-            check = np.amax(E1-E0)
-    nu = 2*np.arctan(np.sqrt((1 + e)/(1 - e))*np.tan(E1/2)) #True Anomaly is a function of Eccentric anomaly
-    p = ((K)*(np.cos(nu+w) + (e*np.cos(w)))+y)
-    return p
-
-def alteredNoERV(x, K, T, P, y): #function generates RV values plot from given parameters
-    nu = 2*np.arctan(np.tan((2*np.pi/P)*(x-T)/2))
-    p = K*np.cos(nu)+y
-    return p
-
 #function generates RV values from given parameters
 def RV(x, mass_ratio, parameters):
     #if orbit is assumed circular (4 elements passed) add zeroes for e and while
@@ -141,10 +119,29 @@ def maxima(cutoff, x, y, y2):
 
 #provides starting point for the MCMC
 def initialGuess(lower, upper, JDp, RVp):
+    def alteredRV(x, K, e, w, T, P, y): #function generates RV values plot from given parameters
+        check = 1
+        M = (2*np.pi/P)*(x-T) #Mean Anomaly is a function of time
+        E1 = M + e*np.sin(M) + ((e**2)*np.sin(2*M)/2) #Eccentric Anomaly is a function of Mean Anomaly
+        while True: #iteratively refines estimate of E1 from initial estimate
+            E0 = E1
+            M0 = E0 - e*np.sin(E0)
+            E1 = E0 +(M-M0)/(1-e*np.cos(E0))
+            if np.amax(E1-E0) < 1e-9 or check-np.amax(E1-E0) == 0:
+                break
+            else:
+                check = np.amax(E1-E0)
+        nu = 2*np.arctan(np.sqrt((1 + e)/(1 - e))*np.tan(E1/2)) #True Anomaly is a function of Eccentric anomaly
+        p = ((K)*(np.cos(nu+w) + (e*np.cos(w)))+y)
+        return p
     return curve_fit(alteredRV, JDp, np.asarray(RVp), bounds=(lower, upper))[0]
 
 #provides starting point for the MCMC, with circular orbit
 def initialGuessNoE(lower, upper, JDp, RVp):
+    def alteredNoERV(x, K, T, P, y): #function generates RV values plot from given parameters
+        nu = 2*np.arctan(np.tan((2*np.pi/P)*(x-T)/2))
+        p = K*np.cos(nu)+y
+        return p
     return curve_fit(alteredNoERV, JDp, np.asarray(RVp), bounds=(lower, upper))[0]
 
 #function calculates and returns the residuals of a particular fit w.r.t. the data

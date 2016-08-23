@@ -19,10 +19,7 @@ adjustment     = f.adjustment
 RV             = f.RV
 residuals      = f.residuals
 constraints    = f.constraints
-constraintsNoE = f.constraintsNoE
-alteredRV      = f.alteredRV
 initialGuess   = f.initialGuess
-alteredNoERV   = f.alteredNoERV
 initialGuessNoE= f.initialGuessNoE
 
 #function calculates mass ratio and error of both the regression and the slope parameter

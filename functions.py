@@ -1,4 +1,5 @@
 import numpy as np
+import emcee
 from scipy import stats
 from matplotlib import pyplot as plt
 from scipy.optimize import curve_fit
@@ -34,15 +35,16 @@ def RV(x, mass_ratio, parameters):
 #    p, s = K*np.cos(nu)+y, (-K/mass_ratio)*np.cos(nu)+y
 #    return p, s
 
-#This periodogram function was taken from Jake Vanderplas' article "Fast Lomb-Scargle Periodograms in Python"
+#This periodogram function was adapted from Jake Vanderplas' article "Fast Lomb-Scargle Periodograms in Python"
 def periodogram(x, rv, f, max_period):
     x = np.array(x)
     rv = np.array(rv)
-# lower limit of periods range set to one hour
-#    delta_x = np.inf 
+    #pseudo-nyquist lower limit
+#    delta_x = np.inf
 #    for i in range(0, len(x)-2):
 #        if x[i+1]-x[i] < delta_x and x[i+1]-x[i] != 0:
 #            delta_x = x[i+1]-x[i]
+    # lower limit of periods range set to one hour
     periods = np.linspace(0.04167, max_period, num = f)
 
     # convert period range into frequency range
@@ -60,6 +62,7 @@ def periodogram(x, rv, f, max_period):
 #slighty altered periodogram function, computes data window for a set of visits
 def dataWindow(x, f, max_period):
     x = np.array(x)
+    #pseudo-nyquist lower limit
 #    delta_x = np.inf 
 #    for i in range(0, len(x)-2):
 #        if x[i+1]-x[i] < delta_x and x[i+1]-x[i] != 0:
@@ -145,9 +148,9 @@ def initialGuessNoE(lower, upper, JDp, RVp):
     return curve_fit(alteredNoERV, JDp, np.asarray(RVp), bounds=(lower, upper))[0]
 
 #function calculates and returns the residuals of a particular fit w.r.t. the data
-def residuals(JDp, JDs, mass_ratio, primary, secondary, parameters):
-    r = np.sqrt(sum((np.asarray(primary)-RV(JDp, mass_ratio, parameters)[0])**2)
-        +sum((np.asarray(secondary)-RV(JDs, mass_ratio, parameters)[1])**2))
+def residuals(JDp, JDs, mass_ratio, RVp, RVs, parameters):
+    r = np.sqrt(sum((np.asarray(RVp)-RV(JDp, mass_ratio, parameters)[0])**2)
+        +sum((np.asarray(RVs)-RV(JDs, mass_ratio, parameters)[1])**2))
     return r
 
 def constraints(parameters, lower, upper):
@@ -160,3 +163,55 @@ def constraints(parameters, lower, upper):
     if  lower[0] < K < upper[0] and lower[1] < e < upper[1] and lower[2] < w < upper[2] and lower[3] < T < upper[3] and lower[4] < P < upper[4] and lower[5] < y < upper[5]:
         return 0
     return -np.inf
+
+def likelihood(parameters, mass_ratio, RVp, RVs, JDp, JDs):
+    r = np.sqrt(sum((np.asarray(RVp)-RV(JDp, mass_ratio, parameters)[0])**2)
+        +sum((np.asarray(RVs)-RV(JDs, mass_ratio, parameters)[1])**2))
+    return -r
+
+#function is poorly named, returns the negative infinity if parameters lie outside contraints, otherwise
+#returns result from likelihood function
+def probability(initial_guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper):
+    con = constraints(initial_guess, lower, upper)
+    if not np.isfinite(con):
+        return -np.inf
+    return likelihood(initial_guess, mass_ratio, RVp, RVs, JDp, JDs)
+
+def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalkers, nsteps):
+    if ndim == 4: #if the fit is circular...
+        del lower_bounds[1:3], upper_bounds[1:3]
+        initial_guess = initialGuessNoE(lower_bounds, upper_bounds, JDp, RVp)
+        #initialize walkers 
+        position = [initial_guess + 0.1*np.random.randn(ndim) for i in range(nwalkers)]
+        #walkers distributed in gaussian ball around most likely parameter values
+        for i in range(nwalkers):
+            position[i][0] = initial_guess[0] + 2.5*np.random.randn(1) #K
+            position[i][1] = initial_guess[1] +     np.random.randn(1) #T
+            position[i][2] = initial_guess[2] + 0.1*np.random.randn(1) #P
+            position[i][3] = initial_guess[3] + 3  *np.random.randn(1) #y
+
+        #create the sampler object and do the walk
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, probability,
+                                        args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=4)
+        sampler.run_mcmc(position, nsteps)
+        return sampler
+    #otherwise, eccentric fit
+    initial_guess = initialGuess(lower_bounds, upper_bounds, JDp, RVp)
+
+    #initialize walkers 
+    position = [initial_guess + 0.1*np.random.randn(ndim) for i in range(nwalkers)]
+
+    #walkers distributed in gaussian ball around most likely parameter values
+    for i in range(nwalkers):
+        position[i][0] = initial_guess[0] + 5  *np.random.randn(1) #K
+        position[i][1] = initial_guess[1] + 0.1*np.random.randn(1) #e
+        position[i][2] = initial_guess[2] + 1  *np.random.randn(1) #w
+        position[i][3] = initial_guess[3] +     np.random.randn(1) #T
+        position[i][4] = initial_guess[4] + 0.1*np.random.randn(1) #P
+        position[i][5] = initial_guess[5] + 3  *np.random.randn(1) #y
+
+    #create the sampler object and take a walk
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, probability,
+                                    args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=4)
+    sampler.run_mcmc(position, nsteps)
+    return sampler

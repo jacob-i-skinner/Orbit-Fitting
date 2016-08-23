@@ -90,3 +90,5 @@ ENV/
 
 #Visual Studio Code settings
 *.vscode
+
+*.png

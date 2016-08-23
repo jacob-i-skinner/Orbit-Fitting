@@ -1,6 +1,6 @@
 #import-libraries-and-data---------------------------------------------------------------------------------------#
 import time
-import emcee
+t0 = time.time()
 import corner
 import numpy as np
 import functions as f
@@ -11,26 +11,25 @@ system       = np.genfromtxt(filename, skip_header=1, usecols=(0, 1, 2))
 
 #define-variables------------------------------------------------------------------------------------------------#
 
-JD, RVp, RVs = [datum[0] for datum in system], [datum[1] for datum in system], [datum[2] for datum in system]
-JDp, JDs     = JD, JD
-samples      = 1000
-max_period   = 9
-power_cutoff = 0.7
-ndim, nwalkers, nsteps = 6, 500, 5000
+JD, RVp, RVs    = [datum[0] for datum in system], [datum[1] for datum in system], [datum[2] for datum in system]
+JDp, JDs        = JD, JD
+samples         = 1000
+max_period      = 9
+power_cutoff    = 0.7
+nwalkers, nsteps= 500, 2000
 
 #define-functions------------------------------------------------------------------------------------------------#
 
-periodogram    = f.periodogram
-dataWindow     = f.dataWindow
-maxima         = f.maxima
-phases         = f.phases
-massRatio      = f.massRatio
-adjustment     = f.adjustment
-RV             = f.RV
-residuals      = f.residuals
-constraints    = f.constraints
-initialGuess   = f.initialGuess
-initialGuessNoE= f.initialGuessNoE
+periodogram     = f.periodogram
+dataWindow      = f.dataWindow
+maxima          = f.maxima
+phases          = f.phases
+massRatio       = f.massRatio
+adjustment      = f.adjustment
+RV              = f.RV
+residuals       = f.residuals
+constraints     = f.constraints
+MCMC            = f.MCMC
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
@@ -102,50 +101,17 @@ plt.savefig(filename + ' RV-phase diagram.png')
 
 #-----------------------MCMC------------------------#
 
-t0 = time.time()
-
 #constrain parameters
 lower_bounds = [0, 0, 0, JD[0]+((JD[-1]-JD[0])/2)-0.75*4.42, 4.43, -75]
 upper_bounds = [100, 0.9, 2*np.pi, JD[0]+((JD[-1]-JD[0])/2)+0.75*4.42, 4.45, -55]
 
-initial_guess = initialGuess(lower_bounds, upper_bounds, JDp, RVp)
-
-def likelihood(parameters, mass_ratio, primary, secondary):
-    r = np.sqrt(sum((np.asarray(primary)-RV(JDp, mass_ratio, parameters)[0])**2)
-        +sum((np.asarray(secondary)-RV(JDs, mass_ratio, parameters)[1])**2))
-    return -r
-
-#function is poorly named, returns the negative infinity if parameters lie outside contraints, otherwise
-#returns result from likelihood function
-def probability(initial_guess, mass_ratio, RVp, RVs, lower, upper):
-    con = constraints(initial_guess, lower, upper)
-    if not np.isfinite(con):
-        return -np.inf
-    return likelihood(initial_guess, mass_ratio, RVp, RVs)
-
-
-
-#initialize walkers 
-position = [initial_guess + 0.1*np.random.randn(ndim) for i in range(nwalkers)]
-
-#walkers distributed in gaussian ball around most likely parameter values
-for i in range(0, nwalkers-1):
-    position[i][0] = initial_guess[0] + 5  *np.random.randn(1) #K
-    position[i][1] = initial_guess[1] + 0.1*np.random.randn(1) #e
-    position[i][2] = initial_guess[2] + 1  *np.random.randn(1) #w
-    position[i][3] = initial_guess[3] +     np.random.randn(1) #T
-    position[i][4] = initial_guess[4] + 0.1*np.random.randn(1) #P
-    position[i][5] = initial_guess[5] + 3  *np.random.randn(1) #y
-
-#create the sampler object and take a walk
-sampler = emcee.EnsembleSampler(nwalkers, ndim, probability,
-                                args=(mass_ratio, RVp, RVs, lower_bounds, upper_bounds), threads=4)
-sampler.run_mcmc(position, nsteps)
+#take a walk
+sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 6, nwalkers, nsteps)
 
 #save the results of the walk
-samples = sampler.chain[:, :, :].reshape((-1, ndim))
+samples = sampler.chain[:, :, :].reshape((-1, 6))
 results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
-                              zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
+                                        zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
 
 #create the corner plot
 fig = corner.corner(samples, labels=["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"],
@@ -157,11 +123,11 @@ fig = corner.corner(samples, labels=["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\
 fig.savefig(filename + " parameter_results.png")
 
 #create the walkers plot
-fig, ax = plt.subplots(ndim, 1, sharex='col')
-for i in range(ndim):
+fig, ax = plt.subplots(6, 1, sharex='col')
+for i in range(6):
     for j in range(len(sampler.chain[:, 0, i])):
         ax[i].plot(np.linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.2)
-    ax[i].plot(np.linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*initial_guess[i], 'r', lw=2)
+    ax[i].plot(np.linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*results[i][0], 'b', lw=2)
 fig.set_figheight(20)
 fig.set_figwidth(15)
 plt.savefig(filename + ' walk_results.png')
@@ -169,12 +135,6 @@ plt.savefig(filename + ' walk_results.png')
 #create the curves plot
 x = np.linspace(0, 15.8, num=nsteps)
 fig, ax = plt.figure(figsize=(15,8)), plt.subplot(111)
-#commented out section shows a sampling of curves from the walk
-#for K, e, w, T, P, y in samples[np.random.randint(len(samples), size=250)]:
-#    parameters = K, e, w, T, P, y
-#    primary, secondary = RV(x, mass_ratio, parameters)
-#    ax.plot(x/parameters[4], primary, 'c', label='Potential Primary Curves', alpha=0.2)
-#    ax.plot(x/parameters[4], secondary, 'm', label='Potential Secondary Curves', alpha=0.2)
 primary, secondary = RV(x, mass_ratio, [results[0][0], results[1][0], results[2][0],
                                         results[3][0], results[4][0], results[5][0]])
 ax.plot(x/results[4][0], primary, 'b', lw=2)
@@ -185,72 +145,36 @@ ax.plot(phases(results[4][0], JDs), RVs, 'rs', label='Secondary RV data')
 ax.set_xlim([0,1])
 plt.savefig(filename + ' curve_results.png')
 
-print('Results:')
-for i in range(len(initial_guess)):
-    print(results[i][0], '+',results[i][1], '-',results[i][2])
-t = time.time()
-print('Completed in ', int((t-t0)/60), ' minutes and ', int(((t-t0)/60-int((t-t0)/60))*60), 'seconds.')
+#print('Results:')
+#for i in range(len(initial_guess)):
+#    print(results[i][0], '+',results[i][1], '-',results[i][2])
+#t = time.time()
+#print('Completed in ', int((t-t0)/60), ' minutes and ', int(((t-t0)/60-int((t-t0)/60))*60), 'seconds.')
 
 
 #-------------circular---MCMC---------------#
 
-#no e MCMC
-t0 = time.time()
-
-#adjustments for a circular fit
-ndim = 4
-del lower_bounds[1:3], upper_bounds[1:3]
-
-initial_guess = initialGuessNoE(lower_bounds, upper_bounds, JDp, RVp)
-
-def likelihood(parameters, mass_ratio, primary, secondary):
-    r = np.sqrt(sum((np.asarray(primary)-RV(JDp, mass_ratio, parameters)[0])**2)
-        +sum((np.asarray(secondary)-RV(JDs, mass_ratio, parameters)[1])**2))
-    return -r
-
-#function is poorly named, returns the negative infinity if parameters lie outside contraints, otherwise
-#returns result from likelihood function
-def probability(initial_guess, mass_ratio, RVp, RVs, lower, upper):
-    con = constraints(initial_guess, lower, upper)
-    if not np.isfinite(con):
-        return -np.inf
-    return likelihood(initial_guess, mass_ratio, RVp, RVs)
-
-#initialize walkers 
-position = [initial_guess + 0.1*np.random.randn(ndim) for i in range(nwalkers)]
-
-#walkers distributed in gaussian ball around most likely parameter values
-for i in range(nwalkers):
-    position[i][0] = initial_guess[0] + 2.5*np.random.randn(1) #K
-    position[i][1] = initial_guess[1] +     np.random.randn(1) #T
-    position[i][2] = initial_guess[2] + 0.1*np.random.randn(1) #P
-    position[i][3] = initial_guess[3] + 3  *np.random.randn(1) #y
-
-#create the sampler object and do the walk
-sampler = emcee.EnsembleSampler(nwalkers, ndim, probability,
-                                args=(mass_ratio, RVp, RVs, lower_bounds, upper_bounds), threads=4)
-sampler.run_mcmc(position, nsteps)
+#take a walk
+sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 4, nwalkers, nsteps)
 
 #save the results of the walk
-
-samples = sampler.chain[:, :, :].reshape((-1, ndim))
-
+circular_samples = sampler.chain[:, :, :].reshape((-1, 4))
 results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
-                              zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
+                              zip(*np.percentile(circular_samples, [16, 50, 84], axis=0)))))
 
 #create the corner plot
-fig = corner.corner(samples, labels=["$K$", "$T$", "$P$", "$\gamma$"],
+fig = corner.corner(circular_samples, labels=["$K$", "$T$", "$P$", "$\gamma$"],
                     extents=[[lower_bounds[0], upper_bounds[0]], [lower_bounds[1],upper_bounds[1]],
                              [lower_bounds[2], upper_bounds[2]], [lower_bounds[3], upper_bounds[3]]],
                     quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 18})
 plt.savefig(filename + ' no e parameter_results.png')
 
 #create the walkers plot
-fig, ax = plt.subplots(ndim, 1, sharex='col')
-for i in range(ndim):
+fig, ax = plt.subplots(4, 1, sharex='col')
+for i in range(4):
     for j in range(len(sampler.chain[:, 0, i])):
         ax[i].plot(np.linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.2)
-    ax[i].plot(np.linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*initial_guess[i], 'r')
+    ax[i].plot(np.linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*results[i][0], 'b', lw=2)
 fig.set_figheight(20)
 fig.set_figwidth(15)
 plt.savefig(filename + ' no e walk_results.png')
@@ -267,8 +191,8 @@ ax.plot(phases(results[2][0], JDs), RVs, 'rs', label='Secondary RV data')
 ax.set_xlim([0,1])
 plt.savefig(filename + ' no e curve_results.png')
 
-print('Results:')
-for i in range(len(initial_guess)):
-    print(results[i][0], '+',results[i][1], '-',results[i][2])
-t = time.time()
-print('Completed in ', int((t-t0)/60), ' minutes and ', int(((t-t0)/60-int((t-t0)/60))*60), 'seconds.')
+#print('Results:')
+#for i in range(len(initial_guess)):
+#    print(results[i][0], '+',results[i][1], '-',results[i][2])
+#t = time.time()
+#print('Completed in ', int((t-t0)/60), ' minutes and ', int(((t-t0)/60-int((t-t0)/60))*60), 'seconds.')

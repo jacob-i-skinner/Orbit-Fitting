@@ -1,3 +1,5 @@
+####### Revisit, check code from current massRatios() ######
+
 import os
 import numpy as np
 table = open('Mass Ratios.tbl', 'a+')
@@ -11,4 +13,4 @@ for i in range(0,len(os.listdir())-1):
         #plt.plot(RVs, RVp, 'r.')
         #plt.plot(np.linspace(-80,60, num=10), np.linspace(-80,60, num=10)*m+b)
         print(os.listdir()[i],':', -m, file=table)
-        #TO-DO: uncertainties see Lab 3 from PHYS 326
+        #TO-DO: uncertainties, see Lab 3 from PHYS 326

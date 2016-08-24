@@ -40,12 +40,13 @@ def periodogram(x, rv, f, max_period):
     x = np.array(x)
     rv = np.array(rv)
     #pseudo-nyquist lower limit
-#    delta_x = np.inf
-#    for i in range(0, len(x)-2):
-#        if x[i+1]-x[i] < delta_x and x[i+1]-x[i] != 0:
-#            delta_x = x[i+1]-x[i]
+    delta_x = np.inf
+    for i in range(0, len(x)-2):
+        if x[i+1]-x[i] < delta_x and x[i+1]-x[i] != 0:
+            delta_x = x[i+1]-x[i]
     # lower limit of periods range set to one hour
-    periods = np.linspace(0.04167, max_period, num = f)
+    periods = np.linspace(delta_x, max_period, num = f)
+    #one hour limit - 0.04167
 
     # convert period range into frequency range
     ang_freqs = 2 * np.pi / periods
@@ -63,11 +64,12 @@ def periodogram(x, rv, f, max_period):
 def dataWindow(x, f, max_period):
     x = np.array(x)
     #pseudo-nyquist lower limit
-#    delta_x = np.inf 
-#    for i in range(0, len(x)-2):
-#        if x[i+1]-x[i] < delta_x and x[i+1]-x[i] != 0:
-#            delta_x = x[i+1]-x[i]
-    periods = np.linspace(0.04167, max_period, num = f)
+    delta_x = np.inf 
+    for i in range(0, len(x)-2):
+        if x[i+1]-x[i] < delta_x and x[i+1]-x[i] != 0:
+            delta_x = x[i+1]-x[i]
+    periods = np.linspace(delta_x, max_period, num = f)
+    #one hour limit - 0.04167
 
     # convert period range into frequency range
     ang_freqs = 2 * np.pi / periods
@@ -112,11 +114,10 @@ def massRatio(x, y, system):
     return -slope, intercept, R2, std_err, slope_err
 
 #function finds local maxima above a specified cutoff power
-def maxima(cutoff, x, y, y2):
-    power = y*y2
+def maxima(cutoff, x, y):
     maxima = np.array([])
-    for i in range(1, len(power)-2):
-        if power[i-1] < power[i] and power[i] > power[i+1] and power[i] > cutoff:
+    for i in range(1, len(y)-2):
+        if y[i-1] < y[i] and y[i] > y[i+1] and y[i] > cutoff:
             maxima = np.append(maxima, x[i])
     return maxima
 

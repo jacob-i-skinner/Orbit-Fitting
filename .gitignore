@@ -91,6 +91,6 @@ ENV/
 #Visual Studio Code settings
 *.vscode
 
+#Plot output from matplotlib
 *.png
-
 *.pdf

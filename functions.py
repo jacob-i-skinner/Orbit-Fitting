@@ -177,7 +177,7 @@ def probability(initial_guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper):
         return -np.inf
     return likelihood(initial_guess, mass_ratio, RVp, RVs, JDp, JDs)
 
-def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalkers, nsteps):
+def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalkers, nsteps, cores):
     if ndim == 4: #if the fit is circular...
         del lower_bounds[1:3], upper_bounds[1:3]
         initial_guess = initialGuessNoE(lower_bounds, upper_bounds, JDp, RVp)
@@ -192,7 +192,7 @@ def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalk
 
         #create the sampler object and do the walk
         sampler = emcee.EnsembleSampler(nwalkers, ndim, probability,
-                                        args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=4)
+                                        args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
         sampler.run_mcmc(position, nsteps)
         return sampler
     #otherwise, eccentric fit
@@ -212,6 +212,6 @@ def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalk
 
     #create the sampler object and take a walk
     sampler = emcee.EnsembleSampler(nwalkers, ndim, probability,
-                                    args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=4)
+                                    args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
     sampler.run_mcmc(position, nsteps)
     return sampler

@@ -16,7 +16,7 @@ JDp, JDs        = JD, JD
 samples         = 1000
 max_period      = 9
 power_cutoff    = 0.7
-nwalkers, nsteps= 500, 2000
+nwalkers, nsteps= 14, 100
 
 #define-functions------------------------------------------------------------------------------------------------#
 
@@ -106,7 +106,7 @@ lower_bounds = [0, 0, 0, JD[0]+((JD[-1]-JD[0])/2)-0.75*4.42, 4.43, -75]
 upper_bounds = [100, 0.9, 2*np.pi, JD[0]+((JD[-1]-JD[0])/2)+0.75*4.42, 4.45, -55]
 
 #take a walk
-sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 6, nwalkers, nsteps)
+sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 6, nwalkers, nsteps, 1)
 
 #save the results of the walk
 samples = sampler.chain[:, :, :].reshape((-1, 6))
@@ -115,7 +115,7 @@ results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
 
 #create the corner plot
 fig = corner.corner(samples, labels=["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"],
-                    extents=[[lower_bounds[0], upper_bounds[0]], [lower_bounds[1],upper_bounds[1]],
+                    range=[[lower_bounds[0], upper_bounds[0]], [lower_bounds[1],upper_bounds[1]],
                              [lower_bounds[2], upper_bounds[2]],
                              [lower_bounds[3], upper_bounds[3]], [lower_bounds[4], upper_bounds[4]],
                              [lower_bounds[5], upper_bounds[5]]],
@@ -155,7 +155,7 @@ plt.savefig(filename + ' curve_results.png')
 #-------------circular---MCMC---------------#
 
 #take a walk
-sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 4, nwalkers, nsteps)
+sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 4, nwalkers, nsteps, 1)
 
 #save the results of the walk
 circular_samples = sampler.chain[:, :, :].reshape((-1, 4))
@@ -164,7 +164,7 @@ results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
 
 #create the corner plot
 fig = corner.corner(circular_samples, labels=["$K$", "$T$", "$P$", "$\gamma$"],
-                    extents=[[lower_bounds[0], upper_bounds[0]], [lower_bounds[1],upper_bounds[1]],
+                    range=[[lower_bounds[0], upper_bounds[0]], [lower_bounds[1],upper_bounds[1]],
                              [lower_bounds[2], upper_bounds[2]], [lower_bounds[3], upper_bounds[3]]],
                     quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 18})
 plt.savefig(filename + ' no e parameter_results.png')
@@ -194,5 +194,5 @@ plt.savefig(filename + ' no e curve_results.png')
 #print('Results:')
 #for i in range(len(initial_guess)):
 #    print(results[i][0], '+',results[i][1], '-',results[i][2])
-#t = time.time()
-#print('Completed in ', int((t-t0)/60), ' minutes and ', int(((t-t0)/60-int((t-t0)/60))*60), 'seconds.')
+t = time.time()
+print('Completed in ', int((t-t0)/60), ' minutes and ', int(((t-t0)/60-int((t-t0)/60))*60), 'seconds.')

@@ -149,10 +149,16 @@ def initialGuessNoE(lower, upper, JDp, RVp):
     return curve_fit(alteredNoERV, JDp, np.asarray(RVp), bounds=(lower, upper))[0]
 
 #function calculates and returns the residuals of a particular fit w.r.t. the data
-def residuals(JDp, JDs, mass_ratio, RVp, RVs, parameters):
+def residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs):
     r = np.sqrt(sum((np.asarray(RVp)-RV(JDp, mass_ratio, parameters)[0])**2)
         +sum((np.asarray(RVs)-RV(JDs, mass_ratio, parameters)[1])**2))
     return r
+
+def rSquared(parameters, mass_ratio, RVp, RVs, JDp, JDs):
+    SSres = residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs)**2
+    SStot = sum((np.asarray(RVp)-np.mean(np.asarray(RVp)))**2)+sum((np.asarray(RVs)-np.mean(np.asarray(RVs)))**2)
+    r2    = 1-SSres/SStot
+    return r2
 
 def constraints(parameters, lower, upper):
     if len(parameters) == 4:

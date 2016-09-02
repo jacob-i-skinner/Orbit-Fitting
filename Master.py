@@ -163,10 +163,14 @@ results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                               zip(*np.percentile(circular_samples, [16, 50, 84], axis=0)))))
 
 #create the corner plot
-fig = corner.corner(circular_samples, labels=["$K$", "$T$", "$P$", "$\gamma$"],
-                    range=[[lower_bounds[0], upper_bounds[0]], [lower_bounds[1],upper_bounds[1]],
-                             [lower_bounds[2], upper_bounds[2]], [lower_bounds[3], upper_bounds[3]]],
-                    quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 18})
+    fig = corner.corner(samples,labels=['$K$','$e$','$\omega$','$T$','$P$','$\gamma$'],
+                        range=  [[lower_bounds[0],upper_bounds[0]],
+                                 [lower_bounds[1],upper_bounds[1]],
+                                 [lower_bounds[2],upper_bounds[2]],
+                                 [lower_bounds[3],upper_bounds[3]],
+                                 [lower_bounds[4],upper_bounds[4]],
+                                 [lower_bounds[5],upper_bounds[5]]],
+                        quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 18})
 plt.savefig(filename + ' no e parameter_results.png')
 
 #create the walkers plot

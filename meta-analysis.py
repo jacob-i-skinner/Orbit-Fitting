@@ -46,9 +46,15 @@ JDs, RVs = adjustment(JD, RVs)
 lower_bounds = [0, 0, 0, JD[0]+((JD[-1]-JD[0])/2)-0.75*15.8, 15.7, 5]
 upper_bounds = [100, 0.9, 2*np.pi, JD[0]+((JD[-1]-JD[0])/2)+0.75*15.8, 15.9, 45]
 
-values = np.empty
-
 for k in range(33):
+
+    system       = np.genfromtxt(filename, skip_header=1, usecols=(0, 1, 2), max_rows=(33-k))
+    JD, RVp, RVs    = [datum[0] for datum in system], [datum[1] for datum in system], [datum[2] for datum in system]
+    JDp, JDs        = JD, JD
+    JDp, RVp = adjustment(JD, RVp)
+    JDs, RVs = adjustment(JD, RVs)
+
+    print(system.shape)
 
     #take a walk
     sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 6, nwalkers, nsteps, 4)
@@ -58,11 +64,17 @@ for k in range(33):
     results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                                   zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
 #create the corner plot
-    fig = corner.corner(circular_samples, labels=["$K$", "$T$", "$P$", "$\gamma$"],
-                    range=[[lower_bounds[0], upper_bounds[0]], [lower_bounds[1],upper_bounds[1]],
-                             [lower_bounds[2], upper_bounds[2]], [lower_bounds[3], upper_bounds[3]]],
-                    quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 18})
-    plt.savefig('Systems/DQ Tau/test/%scorner.png'%(33-k))
+    fig = corner.corner(samples,labels=['$K$','$e$','$\omega$','$T$','$P$','$\gamma$'],
+                        range=  [[lower_bounds[0],upper_bounds[0]],
+                                 [lower_bounds[1],upper_bounds[1]],
+                                 [lower_bounds[2],upper_bounds[2]],
+                                 [lower_bounds[3],upper_bounds[3]],
+                                 [lower_bounds[4],upper_bounds[4]],
+                                 [lower_bounds[5],upper_bounds[5]]],
+                        quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 18})
+    plt.savefig('Systems/DQ Tau/test/%s corner.png'%(33-k))
+
+    plt.close(fig)
 
 #print('Results:')
 #for i in range(len(initial_guess)):

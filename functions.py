@@ -185,7 +185,8 @@ def probability(initial_guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper):
     return likelihood(initial_guess, mass_ratio, RVp, RVs, JDp, JDs)
 
 def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalkers, nsteps, cores):
-    if ndim == 4: #if the fit is circular...
+    #if the fit is circular...
+    if ndim == 4:
         del lower_bounds[1:3], upper_bounds[1:3]
         initial_guess = initialGuessNoE(lower_bounds, upper_bounds, JDp, RVp)
         #initialize walkers 
@@ -202,6 +203,7 @@ def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalk
                                         args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
         sampler.run_mcmc(position, nsteps)
         return sampler
+
     #otherwise, eccentric fit
     initial_guess = initialGuess(lower_bounds, upper_bounds, JDp, RVp)
 

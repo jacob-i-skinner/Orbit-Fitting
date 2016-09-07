@@ -6,7 +6,7 @@ import numpy as np
 import functions as f
 from scipy import stats
 from matplotlib import pyplot as plt
-filename     = 'Systems/2M17204248+4205070/2M17204248+4205070.tbl'
+filename     = 'Systems/DQ Tau/DQ Tau.tbl'
 system       = np.genfromtxt(filename, skip_header=1, usecols=(0, 1, 2))
 
 #define-variables------------------------------------------------------------------------------------------------#
@@ -33,9 +33,7 @@ MCMC            = f.MCMC
 JDp, RVp = adjustment(JD, RVp)
 JDs, RVs = adjustment(JD, RVs)
 
-k = 0
-
-while not k == 15 :
+for k in range(16):
     #calculate periodograms
     x, y  = periodogram(JDp, RVp, samples, max_period)
     y2    = periodogram(JDs, RVs, samples, max_period)[1]
@@ -49,13 +47,13 @@ while not k == 15 :
     ax.plot(x, y*y2-y3*y4, 'k', alpha = 1)
     ax.set_ylim(0,1)
     ax.set_xlim(0,max_period)
-    ax.set_title('%s data points'%(15-k))
-    plt.savefig('/Users/skinnej3/Desktop/%s adjusted periodogram.png'%(15-k))
-    RVp = np.delete(RVp, RVp[-1])
-    RVs = np.delete(RVs, RVs[-1])
-    JDp = np.delete(JDp, JDp[-1])
-    JDs = np.delete(JDs, JDs[-1])
-    k += 1
+    ax.set_title('%s data points'%(16-k))
+    plt.savefig('/Users/skinnej3/Desktop/%s adjusted periodogram.png'%(16-k))
+    system       = np.genfromtxt(filename, skip_header=1, usecols=(0, 1, 2), max_rows=(16-k))
+    JD, RVp, RVs    = [datum[0] for datum in system], [datum[1] for datum in system], [datum[2] for datum in system]
+    JDp, JDs        = JD, JD
+    JDp, RVp = adjustment(JD, RVp)
+    JDs, RVs = adjustment(JD, RVs)
 
 t = time.time()
 print('Completed in ', int((t-t0)/60), ' minutes and ', int(((t-t0)/60-int((t-t0)/60))*60), 'seconds.')

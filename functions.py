@@ -195,7 +195,7 @@ def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalk
         for i in range(nwalkers):
             position[i][0] = initial_guess[0] + 2.5*np.random.randn(1) #K
             position[i][1] = initial_guess[1] +     np.random.randn(1) #T
-            position[i][2] = initial_guess[2] + 0.1*np.random.randn(1) #P
+            position[i][2] = initial_guess[2] + 2  *np.random.randn(1) #P
             position[i][3] = initial_guess[3] + 3  *np.random.randn(1) #y
 
         #create the sampler object and do the walk
@@ -216,7 +216,7 @@ def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalk
         position[i][1] = initial_guess[1] + 0.1*np.random.randn(1) #e
         position[i][2] = initial_guess[2] + 1  *np.random.randn(1) #w
         position[i][3] = initial_guess[3] +     np.random.randn(1) #T
-        position[i][4] = initial_guess[4] + 0.1*np.random.randn(1) #P
+        position[i][4] = initial_guess[4] + 2  *np.random.randn(1) #P
         position[i][5] = initial_guess[5] + 3  *np.random.randn(1) #y
 
     #create the sampler object and take a walk

@@ -171,6 +171,7 @@ def constraints(parameters, lower, upper):
         return 0
     return -np.inf
 
+#lnlike
 def likelihood(parameters, mass_ratio, RVp, RVs, JDp, JDs):
     r = np.sqrt(sum((np.asarray(RVp)-RV(JDp, mass_ratio, parameters)[0])**2)
         +sum((np.asarray(RVs)-RV(JDs, mass_ratio, parameters)[1])**2))
@@ -178,6 +179,7 @@ def likelihood(parameters, mass_ratio, RVp, RVs, JDp, JDs):
 
 #function is poorly named, returns the negative infinity if parameters lie outside contraints, otherwise
 #returns result from likelihood function
+
 def probability(initial_guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper):
     con = constraints(initial_guess, lower, upper)
     if not np.isfinite(con):

@@ -144,23 +144,21 @@ def initialGuessNoE(lower, upper, JDp, RVp):
     return curve_fit(alteredNoERV, JDp, np.asarray(RVp), bounds=(lower, upper))[0]
 
 #returns the residual error of the data w.r.t. a particular fit
-#note that in general, more visits means higher residual error
+#is now a properly "normalized" RMS error
 def residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs):
-    r = np.sqrt(sum((np.asarray(RVp)-RV(JDp, mass_ratio, parameters)[0])**2)
-        +sum((np.asarray(RVs)-RV(JDs, mass_ratio, parameters)[1])**2))
+    r = np.sqrt(sum((np.asarray(RVp)-RV(JDp, mass_ratio, parameters)[0])**2)/(len(RVp))
+        +sum((np.asarray(RVs)-RV(JDs, mass_ratio, parameters)[1])**2)/(len(RVs)))
     return r
 
 #returns the coefficient of determination for a particular fit
 def rSquared(parameters, mass_ratio, RVp, RVs, JDp, JDs):
-    SSres = residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs)**2
-    SStot = sum((np.asarray(RVp)-np.mean(np.asarray(RVp)))**2)
-            +sum((np.asarray(RVs)-np.mean(np.asarray(RVs)))**2)
+    SSres = sum((np.asarray(RVp)-RV(JDp, mass_ratio, parameters)[0])**2)+sum((np.asarray(RVs)-RV(JDs, mass_ratio, parameters)[1])**2)
+    SStot = sum((np.asarray(RVp)-np.mean(np.asarray(RVp)))**2)+sum((np.asarray(RVs)-np.mean(np.asarray(RVs)))**2)
     r2    = 1-SSres/SStot
     return r2
 
-#all of the functions below are either the MCMC process itself, or critical support functions
-
-#the below functions were adapted from the "fitting a model to data" example by Dan Foreman-Mackey, on the emcee website
+#the functions below are either the MCMC itself, or critical support functions
+#they were adapted from the "fitting a model to data" example by Dan Foreman-Mackey, on the emcee website
 
 def constraints(parameters, lower, upper):
     if len(parameters) == 4:
@@ -169,23 +167,17 @@ def constraints(parameters, lower, upper):
             return 0
         return -np.inf
     K, e, w, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5]
-    if  lower[0] < K < upper[0] and lower[1] < e < upper[1] and lower[2] < w < upper[2] and lower[3] < T < upper[3] and lower[4] < P < upper[4] and lower[5] < y < upper[5]:
+    if  lower[0] < K < upper[0] and -1 < e < 1 and -2*np.pi < w < 2*np.pi and lower[3] < T < upper[3] and lower[4] < P < upper[4] and lower[5] < y < upper[5]:
         return 0
     return -np.inf
 
-#lnlike
-def likelihood(parameters, mass_ratio, RVp, RVs, JDp, JDs):
-    r = np.sqrt(sum((np.asarray(RVp)-RV(JDp, mass_ratio, parameters)[0])**2)
-        +sum((np.asarray(RVs)-RV(JDs, mass_ratio, parameters)[1])**2))
-    return -r
-
-#function is poorly named, returns the negative infinity if parameters lie outside contraints, otherwise
-#returns result from likelihood function
-def probability(initial_guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper):
+#not technically probability, returns the negative infinity if parameters lie outside contraints, otherwise
+#returns negative of RMS error, emcee tries to maximize this quantity
+def probability(initial_guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
     con = constraints(initial_guess, lower, upper)
     if not np.isfinite(con):
         return -np.inf
-    return likelihood(initial_guess, mass_ratio, RVp, RVs, JDp, JDs)
+    return -residuals(initial_guess, mass_ratio, RVp, RVs, JDp, JDs)
 
 def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalkers, nsteps, cores):
     #if the fit is circular...

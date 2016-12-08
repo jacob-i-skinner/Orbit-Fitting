@@ -1,5 +1,4 @@
-import numpy as np
-import emcee
+import numpy as np, emcee
 from scipy import stats
 from matplotlib import pyplot as plt
 from scipy.optimize import curve_fit

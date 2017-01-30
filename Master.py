@@ -1,8 +1,8 @@
 #import-libraries-and-data---------------------------------------------------------------------------------------#
-import corner, numpy as np, functions as f
+import corner, os, numpy as np, functions as f
 from scipy import stats
 from matplotlib import pyplot as plt
-filename     = 'Systems/2M17204248+4205070/2M17204248+4205070.tbl'
+filename     = 'Systems/DR13/Tables/2M04281703+5521194.tbl'
 system       = np.genfromtxt(filename, skip_header=1, usecols=(0, 1, 2))
 
 #define-variables------------------------------------------------------------------------------------------------#
@@ -33,7 +33,7 @@ lowEFit         = f.lowEFit
 #plot Wilkinson plot (mass ratio)
 mass_ratio, intercept, r_squared, standard_error, slope_error = massRatio(RVs,RVp, system)
 systemic_velocity = intercept/(1+mass_ratio)
-'''
+
 fig = plt.figure(figsize=(5,5))
 ax = plt.subplot(111)
 ax.plot(RVs, RVp, 'k.')
@@ -42,8 +42,9 @@ x, y = np.array([np.nanmin(RVs), np.nanmax(RVs)]),-mass_ratio*np.array([np.nanmi
 ax.plot(x, y)
 ax.set_ylabel('Primary Velocity', size='15')
 ax.set_xlabel('Secondary Velocity', size='15')
-plt.savefig(filename + ' mass ratio.png')
-'''
+#plt.savefig(filename + ' mass ratio.png')
+#plt.show()
+
 print('mass ratio is ', mass_ratio, "+/-", standard_error, '\nsystemic velocity is ', systemic_velocity)
 
 #check for invalid values
@@ -149,8 +150,8 @@ fig = corner.corner(samples, labels=["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\
                              [lower_bounds[5], upper_bounds[5]]],
                     quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 18})
 #fig.savefig(filename + " parameter_results.png")
-'''
-'''
+
+
 #create the walkers plot
 fig, ax = plt.subplots(5, 1, sharex='col')
 for i in range(5):

@@ -126,11 +126,22 @@ print("T sampler output", T_results)
 
 results[3] = T_results
 
+#write results to console
 print('Results:')
 for i in range(6):
     print(results[i][0], '+',results[i][1], '-',results[i][2])
 print('Total error: ', residuals([results[0][0], results[1][0], results[2][0],
                      results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs))
+
+#write results to log file
+table = open('log.txt', 'a+')
+labels = ('K', 'e', 'w', 'T', 'P', 'y')
+print(filename, " results:", file = table)
+print('Total error: ', residuals([results[0][0], results[1][0], results[2][0],
+                     results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs), file = table)
+for i in range(6):
+    print(labels[i], ' = ', results[i][0], ' +', results[i][1], ' -', results[i][2], file = table)
+
 
 '''
 #create the corner plot

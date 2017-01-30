@@ -16,17 +16,8 @@ nwalkers, nsteps= 400, 10000
 
 #define-functions------------------------------------------------------------------------------------------------#
 
-periodogram     = f.periodogram
-dataWindow      = f.dataWindow
-maxima          = f.maxima
-phases          = f.phases
-massRatio       = f.massRatio
-adjustment      = f.adjustment
-RV              = f.RV
-residuals       = f.residuals
-constraints     = f.constraints
-MCMC            = f.MCMC
-lowEFit         = f.lowEFit
+periodogram, dataWindow, maxima, phases, massRatio = f.periodogram, f.dataWindow, f.maxima, f.phases, f.massRatio
+adjustment, RV, residuals, constraints, MCMC, lowEFit = f.adjustment, f.RV, f.residuals, f.constraints, f.MCMC, f.lowEFit
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 

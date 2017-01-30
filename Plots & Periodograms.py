@@ -15,13 +15,8 @@ nwalkers, nsteps= 400, 10000
 
 #define-functions------------------------------------------------------------------------------------------------#
 
-periodogram     = f.periodogram
-dataWindow      = f.dataWindow
-maxima          = f.maxima
-phases          = f.phases
-massRatio       = f.massRatio
-adjustment      = f.adjustment
-
+periodogram, dataWindow, maxima, phases = f.periodogram, f.dataWindow, f.maxima, f.phases
+massRatio, adjustment                   = f.massRatio, f.adjustment
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 

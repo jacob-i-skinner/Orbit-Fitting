@@ -53,7 +53,7 @@ def periodogram(x, rv, f, max_period):
     # normalize the power
     N = len(x)
     powers *= 2 / (N * rv.std() ** 2)
-    return periods, powers
+    return periods, powers, delta_x
 
 #slighty altered periodogram function, computes data window for a set of visits
 def dataWindow(x, f, max_period):
@@ -178,6 +178,12 @@ def probability(initial_guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #l
         return -np.inf
     return -residuals(initial_guess, mass_ratio, RVp, RVs, JDp, JDs)
 
+def goodnessOfFit(fit, parameters, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
+    if not lower[3] < fit < upper[3]:
+        return -np.inf
+    fit = [parameters[0], parameters[1], parameters[2], fit, parameters[4], parameters[5]]
+    return -residuals(fit, mass_ratio, RVp, RVs, JDp, JDs)
+
 def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalkers, nsteps, cores):
     #if the fit is circular...
     if ndim == 4:
@@ -194,7 +200,7 @@ def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalk
             position[i][3] = initial_guess[3] + 3  *np.random.randn(1) #y
 
         #create the sampler object and take a walk
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, probability,
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, probability, a=4.0,
                                         args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
         sampler.run_mcmc(position, nsteps)
         return sampler
@@ -205,11 +211,19 @@ def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalk
     for i in range(nwalkers):
         position[i][0] = initial_guess[0] + 5  *np.random.randn(1) #K
         position[i][1] = initial_guess[1] + 0.1*np.random.randn(1) #e
-        position[i][2] = initial_guess[2] + 1  *np.random.randn(1) #w
+        position[i][2] = initial_guess[2] +     np.random.randn(1) #w
         position[i][3] = initial_guess[3] +     np.random.randn(1) #T
         position[i][4] = initial_guess[4] + 2  *np.random.randn(1) #P
         position[i][5] = initial_guess[5] + 3  *np.random.randn(1) #y
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, probability,
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, probability, a=4.0,
                                     args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
+    sampler.run_mcmc(position, nsteps)
+    return sampler
+
+def lowEFit(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nwalkers, nsteps, cores, parameters):
+    initial_guess = parameters
+    position = [initial_guess[3] + np.random.randn(1) for i in range(nwalkers)]
+    sampler = emcee.EnsembleSampler(nwalkers, 1, goodnessOfFit, a=4.0,
+                                    args=(parameters, mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
     sampler.run_mcmc(position, nsteps)
     return sampler

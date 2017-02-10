@@ -34,14 +34,15 @@ def RV(x, mass_ratio, parameters):
 def periodogram(x, rv, f, max_period):
     x = np.array(x)
     rv = np.array(rv)
-    #currently using a pseudo-nyquist lower limit in favor of an arbritrary lower limit, to avoid spurious periods at high frequencies
+    #if using a pseudo-nyquist lower limit in favor of an arbritrary lower limit, uncomment below
     delta_x = np.inf
-    for i in range(0, len(x)-2):
-        if x[i+1]-x[i] < delta_x and x[i+1]-x[i] != 0:
-            delta_x = x[i+1]-x[i]
-    # lower limit of periods range set to one hour
+    #sorted copy of x, 'x_prime', is used to find minimum time spacing between visits
+    x_prime = np.sort(x)
+    for i in range(0, len(x_prime)-2):
+        if x_prime[i+1]-x_prime[i] < delta_x and x_prime[i+1]-x_prime[i] != 0:
+            delta_x = x_prime[i+1]-x_prime[i]
     periods = np.linspace(delta_x, max_period, num = f) #f here is the number of samples taken over the range of periods
-    #one hour limit - 0.04167
+    # if specifiying one hour limit, use 0.04167 instead of delta_x
 
     # convert period range into frequency range
     ang_freqs = 2 * np.pi / periods
@@ -59,10 +60,12 @@ def periodogram(x, rv, f, max_period):
 def dataWindow(x, f, max_period):
     x = np.array(x)
     #pseudo-nyquist lower limit
-    delta_x = np.inf 
-    for i in range(0, len(x)-2):
-        if x[i+1]-x[i] < delta_x and x[i+1]-x[i] != 0:
-            delta_x = x[i+1]-x[i]
+    delta_x = np.inf
+    #sorted copy of x, 'x_prime', is used to find minimum time spacing between visits
+    x_prime = np.sort(x)
+    for i in range(0, len(x_prime)-2):
+        if x_prime[i+1]-x_prime[i] < delta_x and x_prime[i+1]-x_prime[i] != 0:
+            delta_x = x_prime[i+1]-x_prime[i]
     periods = np.linspace(delta_x, max_period, num = f)
     #one hour limit - 0.04167
 

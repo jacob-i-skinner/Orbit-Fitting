@@ -2,12 +2,21 @@
 import corner, os, numpy as np, functions as f
 from scipy import stats
 from matplotlib import pyplot as plt
-filename     = 'Systems/DR13/Tables/2M04281703+5521194.tbl'
-system       = np.genfromtxt(filename, skip_header=1, usecols=(0, 1, 2))
+file     = 'Systems/DR13/Tables/2M21442066+4211363.tbl'
+data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3))
+system         = list(file)
+
+# the string manipulations below extract the 2MASS ID from the file name
+while system[0] != '2' and system[1] != 'M':
+    del system[0]
+while system[-1] != '.':
+    del system[-1]
+del system[-1]
+system = ''.join(system)
 
 #define-variables------------------------------------------------------------------------------------------------#
 
-JD, RVp, RVs    = [datum[0] for datum in system], [datum[1] for datum in system], [datum[2] for datum in system]
+JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [datum[2] for datum in data]
 JDp, JDs        = JD, JD
 samples         = 1000
 max_period      = 7.5
@@ -22,7 +31,7 @@ adjustment, RV, residuals, constraints, MCMC, lowEFit = f.adjustment, f.RV, f.re
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
 #plot Wilkinson plot (mass ratio)
-mass_ratio, intercept, r_squared, standard_error, slope_error = massRatio(RVs,RVp, system)
+mass_ratio, intercept, r_squared, standard_error, slope_error = massRatio(RVs,RVp, data)
 systemic_velocity = intercept/(1+mass_ratio)
 
 fig = plt.figure(figsize=(5,5))
@@ -31,12 +40,11 @@ ax.plot(RVs, RVp, 'k.')
 x, y = np.array([np.nanmin(RVs), np.nanmax(RVs)]),-mass_ratio*np.array([np.nanmin(RVs), 
                                                                         np.nanmax(RVs)])+intercept
 ax.plot(x, y)
+ax.set_title(system)
 ax.set_ylabel('Primary Velocity', size='15')
 ax.set_xlabel('Secondary Velocity', size='15')
-#plt.savefig(filename + ' mass ratio.png')
+plt.savefig(file + ' mass ratio.png')
 #plt.show()
-
-print('mass ratio is ', mass_ratio, "+/-", standard_error, '\nsystemic velocity is ', systemic_velocity)
 
 #check for invalid values
 JDp, RVp = adjustment(JD, RVp)
@@ -70,7 +78,7 @@ y3,y4 = dataWindow(JDp, samples, max_period)[1], dataWindow(JDs, samples, max_pe
 #ax2.set_ylabel('Normalized Lomb-Scargle Power', size='20')
 #fig.set_figheight(10)
 #fig.set_figwidth(15)
-#plt.savefig(filename + 'periodogram.png')
+#plt.savefig(file + 'periodogram.png')
 
 
 #plot periodogram - data window
@@ -81,10 +89,10 @@ ax.plot(x, y*y2, 'b', alpha = 0.5)
 ax.plot(x, y3*y4, 'r', alpha = 0.5)
 ax.set_ylim(0,1)
 ax.set_xlim(delta_x,max_period)
-ax.set_title('')
+ax.set_title(system)
 print('Periodogram peaks above a power of %s:' % (power_cutoff), maxima(power_cutoff, x, y*y2-y3*y4))
+plt.savefig(file + ' adjusted periodogram.png')
 plt.show()
-#plt.savefig(filename + ' adjusted periodogram.png')
 '''
 #plot phased RVs
 fig = plt.figure(figsize=(8,3))
@@ -96,12 +104,12 @@ ax.set_title('Period: %s days' %(maxima(power_cutoff, x, y*y2)[2]))
 ax.set_xlabel('Orbital Phase', size='15')
 ax.set_ylabel('Radial Velocity', size='20')
 plt.show()
-#plt.savefig(filename + ' RV-phase diagram.png')
+#plt.savefig(file + ' RV-phase diagram.png')
 '''
 #-----------------------MCMC------------------------#
 
 #constrain parameters
-lower_bounds = [0, -1, 0, JD[0]+((JD[-1]-JD[0])/2)-0.75*3.29, delta_x, min([min(RVp),min(RVs)])]
+lower_bounds = [0, 0, 0, JD[0]+((JD[-1]-JD[0])/2)-0.75*3.29, delta_x, min([min(RVp),min(RVs)])]
 upper_bounds = [200, 1, 2*np.pi, JD[0]+((JD[-1]-JD[0])/2)+0.75*3.29, 7, max([max(RVp),max(RVs)])]
 
 #take a walk
@@ -111,36 +119,37 @@ sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 6, nw
 samples = sampler.chain[:, 2000:, :].reshape((-1, 6))
 results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                               zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
-
 parameters = [0,0,0,0,0,0]
 for i in range(6):
     parameters[i] = results[i][0]
 
 #Adjust T
 sampler = lowEFit(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nwalkers, nsteps, 4, parameters)
+
+#save the results of the adjustment
 samples = sampler.chain[:, 2000:, :].reshape((-1, 1))
 T_results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                               zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
-
-print("T sampler output", T_results)
-
 results[3] = T_results
 
 #write results to console
 print('Results:')
 for i in range(6):
     print(results[i][0], '+',results[i][1], '-',results[i][2])
-print('Total error: ', residuals([results[0][0], results[1][0], results[2][0],
-                     results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs))
+print('RMS error: ', residuals([results[0][0], results[1][0], results[2][0],
+                                results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs))
 
 #write results to log file
 table = open('log.txt', 'a+')
 labels = ('K', 'e', 'w', 'T', 'P', 'y')
-print(filename, " results:", file = table)
-print('Total error: ', residuals([results[0][0], results[1][0], results[2][0],
-                     results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs), file = table)
+print(system, " Results:", file = table)
+print('RMS error: ', residuals([results[0][0], results[1][0], results[2][0],
+                                results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs), file = table)
+print('q  = ', mass_ratio, ' +/-  ', standard_error , file = table)
 for i in range(6):
     print(labels[i], ' = ', results[i][0], ' +', results[i][1], ' -', results[i][2], file = table)
+print('\n')
+table.close()
 
 
 '''
@@ -151,7 +160,7 @@ fig = corner.corner(samples, labels=["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\
                              [lower_bounds[3], upper_bounds[3]], [lower_bounds[4], upper_bounds[4]],
                              [lower_bounds[5], upper_bounds[5]]],
                     quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 18})
-#fig.savefig(filename + " parameter_results.png")
+#fig.savefig(file + " parameter_results.png")
 
 
 #create the walkers plot
@@ -162,7 +171,7 @@ for i in range(5):
     ax[i].plot(np.linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*results[i][0], 'b', lw=2)
 fig.set_figheight(20)
 fig.set_figwidth(15)
-#plt.savefig(filename + ' walk_results.png')
+#plt.savefig(file + ' walk_results.png')
 '''
 
 #create the curves plot
@@ -176,10 +185,9 @@ ax.plot(x, np.ones(len(x))*results[5][0], 'k' , label='Systemic Velocity')
 ax.plot(phases(results[4][0], JDp), RVp, 'bs', label='Primary RV Data') #data phased to result period
 ax.plot(phases(results[4][0], JDs), RVs, 'rs', label='Secondary RV data')
 ax.set_xlim([0,1])
-plt.title(residuals([results[0][0], results[1][0], results[2][0],
-                     results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs))
-plt.show()
-#plt.savefig(filename + ' curve_results.png')
+plt.title(system)
+plt.savefig(file + ' curve_results.png')
+#plt.show()
 
 #-------------circular---MCMC---------------#
 '''
@@ -194,8 +202,9 @@ results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
 print('Results:')
 for i in range(4):
     print(results[i][0], '+',results[i][1], '-',results[i][2])
-print('Total error: ', residuals([results[0][0], results[1][0], results[2][0],
-                     results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs))
+print('RMS error: ', residuals([results[0][0], results[1][0],
+                                results[2][0], results[3][0]], mass_ratio, RVp, RVs, JDp, JDs))
+
 
 #create the corner plot
 #fig = corner.corner(samples,labels=['$K$','$e$','$\omega$','$T$','$P$','$\gamma$'],
@@ -206,7 +215,7 @@ print('Total error: ', residuals([results[0][0], results[1][0], results[2][0],
 #                                 [lower_bounds[4],upper_bounds[4]],
 #                                 [lower_bounds[5],upper_bounds[5]]],
 #                        quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 18})
-#plt.savefig(filename + ' no e parameter_results.png')
+#plt.savefig(file + ' no e parameter_results.png')
 
 #create the walkers plot
 #fig, ax = plt.subplots(4, 1, sharex='col')
@@ -216,7 +225,7 @@ print('Total error: ', residuals([results[0][0], results[1][0], results[2][0],
 #    ax[i].plot(np.linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*results[i][0], 'b', lw=2)
 #fig.set_figheight(20)
 #fig.set_figwidth(15)
-#plt.savefig(filename + ' no e walk_results.png')
+#plt.savefig(file + ' no e walk_results.png')
 
 #create the curves plot
 x = np.linspace(0, 15.8, num=nsteps)
@@ -231,5 +240,5 @@ ax.set_xlim([0,1])
 plt.title(residuals([results[0][0], results[1][0],
                      results[2][0], results[3][0]], mass_ratio, RVp, RVs, JDp, JDs))
 plt.show()
-#plt.savefig(filename + ' no e curve_results.png')
+#plt.savefig(file + ' no e curve_results.png')
 '''

@@ -1,17 +1,27 @@
 #import-libraries-and-data---------------------------------------------------------------------------------------#
 import numpy as np, functions as f
 from matplotlib import pyplot as plt
-filename     = 'Systems/DR13/Tables/2M21442066+4211363.tbl'
-system       = np.genfromtxt(filename, skip_header=1, usecols=(0, 1, 2))
+from matplotlib import rcParams
+rcParams.update({'figure.autolayout': True})
+file     = 'Systems/DR13/Tables/2M21442066+4211363.tbl'
+data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3))
+system         = list(file)
+
+# the string manipulations below extract the 2MASS ID from the file name
+while system[0] != '2' and system[1] != 'M':
+    del system[0]
+while system[-1] != '.':
+    del system[-1]
+del system[-1]
+system = ''.join(system)
 
 #define-variables------------------------------------------------------------------------------------------------#
 
-JD, RVp, RVs    = [datum[0] for datum in system], [datum[1] for datum in system], [datum[2] for datum in system]
+JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [datum[2] for datum in data]
 JDp, JDs        = JD, JD
 samples         = 1000
-max_period      = 7.5
+max_period      = 12
 power_cutoff    = 0.8
-nwalkers, nsteps= 400, 10000
 
 #define-functions------------------------------------------------------------------------------------------------#
 
@@ -21,7 +31,7 @@ massRatio, adjustment                   = f.massRatio, f.adjustment
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
 #plot Wilkinson plot (mass ratio)
-mass_ratio, intercept, r_squared, standard_error, slope_error = massRatio(RVs,RVp, system)
+mass_ratio, intercept, r_squared, standard_error, slope_error = massRatio(RVs,RVp, data)
 systemic_velocity = intercept/(1+mass_ratio)
 
 fig = plt.figure(figsize=(5,5))
@@ -30,10 +40,13 @@ ax.plot(RVs, RVp, 'k.')
 x, y = np.array([np.nanmin(RVs), np.nanmax(RVs)]),-mass_ratio*np.array([np.nanmin(RVs), 
                                                                         np.nanmax(RVs)])+intercept
 ax.plot(x, y)
-ax.set_ylabel('Primary Velocity', size='15')
-ax.set_xlabel('Secondary Velocity', size='15')
-plt.savefig(filename + ' mass ratio.png')
-#plt.show()
+ax.set_title(system)
+ax.text(-20, 20, 'q = %s $\pm$ %s\n$\gamma$ = %s $\\frac{km}{s}$' %(np.round(mass_ratio, decimals = 3), np.round(standard_error, decimals = 3),
+                                                     np.round(systemic_velocity, decimals = 1)))
+ax.set_ylabel('Primary Velocity (km/s)')#, size='15')
+ax.set_xlabel('Secondary Velocity (km/s)')#, size='15')
+plt.savefig(file + ' mass ratio.png')
+plt.show()
 
 print('mass ratio is ', mass_ratio, "+/-", standard_error, '\nsystemic velocity is ', systemic_velocity)
 
@@ -69,7 +82,7 @@ y3,y4 = dataWindow(JDp, samples, max_period)[1], dataWindow(JDs, samples, max_pe
 #ax2.set_ylabel('Normalized Lomb-Scargle Power', size='20')
 #fig.set_figheight(10)
 #fig.set_figwidth(15)
-#plt.savefig(filename + 'periodogram.png')
+#plt.savefig(file + 'periodogram.png')
 
 
 #plot periodogram - data window
@@ -80,10 +93,12 @@ ax.plot(x, y*y2, 'b', alpha = 0.5)
 ax.plot(x, y3*y4, 'r', alpha = 0.5)
 ax.set_ylim(0,1)
 ax.set_xlim(delta_x,max_period)
-ax.set_title('')
-print('Periodogram peaks above a power of %s:' % (power_cutoff), maxima(power_cutoff, x, y*y2-y3*y4))
+ax.set_ylabel('Periodogram Power')#, size='15')
+ax.set_xlabel('Period (days)')#, size='15')
+ax.set_title(system)
+plt.savefig(file + ' adjusted periodogram.png')
 #plt.show()
-plt.savefig(filename + ' adjusted periodogram.png')
+
 '''
 #plot phased RVs
 fig = plt.figure(figsize=(8,3))
@@ -91,9 +106,8 @@ ax = plt.subplot(111)
 ax.plot(phases(maxima(power_cutoff, x, y*y2)[2], JDp), RVp, 'k.')
 ax.plot(phases(maxima(power_cutoff, x, y*y2)[2], JDs), RVs, 'r.')
 ax.plot(phases(maxima(power_cutoff, x, y*y2)[2], JDp), systemic_velocity*np.ones(len(JDp)))
-ax.set_title('Period: %s days' %(maxima(power_cutoff, x, y*y2)[2]))
 ax.set_xlabel('Orbital Phase', size='15')
 ax.set_ylabel('Radial Velocity', size='20')
 plt.show()
-#plt.savefig(filename + ' RV-phase diagram.png')
+#plt.savefig(file + ' RV-phase diagram.png')
 '''

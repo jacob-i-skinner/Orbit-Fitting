@@ -2,8 +2,10 @@
 import corner, os, numpy as np, functions as f
 from scipy import stats
 from matplotlib import pyplot as plt
-file     = 'Systems/DR13/Tables/2M21442066+4211363.tbl'
-data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3))
+from matplotlib import rcParams
+rcParams.update({'figure.autolayout': True})
+file     = 'Systems/DR13/2M17204248+4205070.tbl'
+data       = np.genfromtxt(file, skip_header=1, usecols=(0, 1, 2))
 system         = list(file)
 
 # the string manipulations below extract the 2MASS ID from the file name
@@ -21,7 +23,7 @@ JDp, JDs        = JD, JD
 samples         = 1000
 max_period      = 7.5
 power_cutoff    = 0.8
-nwalkers, nsteps= 400, 10000
+nwalkers, nsteps= 400, 20000
 
 #define-functions------------------------------------------------------------------------------------------------#
 
@@ -41,8 +43,10 @@ x, y = np.array([np.nanmin(RVs), np.nanmax(RVs)]),-mass_ratio*np.array([np.nanmi
                                                                         np.nanmax(RVs)])+intercept
 ax.plot(x, y)
 ax.set_title(system)
-ax.set_ylabel('Primary Velocity', size='15')
-ax.set_xlabel('Secondary Velocity', size='15')
+ax.text(0, 20, 'q = %s $\pm$ %s\n$\gamma$ = %s $\\frac{km}{s}$' %(np.round(mass_ratio, decimals = 3), np.round(standard_error, decimals = 3),
+                                                     np.round(systemic_velocity, decimals = 3)))
+ax.set_ylabel('Primary Velocity (km/s)')#, size='15')
+ax.set_xlabel('Secondary Velocity (km/s)')#, size='15')
 plt.savefig(file + ' mass ratio.png')
 #plt.show()
 
@@ -87,10 +91,11 @@ ax = plt.subplot(111)
 ax.plot(x, y*y2-y3*y4, 'k', alpha = 1)
 ax.plot(x, y*y2, 'b', alpha = 0.5)
 ax.plot(x, y3*y4, 'r', alpha = 0.5)
+ax.set_ylabel('Periodogram Power')#, size='15')
+ax.set_xlabel('Period (days)')#, size='15')
 ax.set_ylim(0,1)
 ax.set_xlim(delta_x,max_period)
 ax.set_title(system)
-print('Periodogram peaks above a power of %s:' % (power_cutoff), maxima(power_cutoff, x, y*y2-y3*y4))
 plt.savefig(file + ' adjusted periodogram.png')
 plt.show()
 '''
@@ -109,7 +114,7 @@ plt.show()
 #-----------------------MCMC------------------------#
 
 #constrain parameters
-lower_bounds = [0, 0, 0, JD[0]+((JD[-1]-JD[0])/2)-0.75*3.29, delta_x, min([min(RVp),min(RVs)])]
+lower_bounds = [0, -1, 0, JD[0]+((JD[-1]-JD[0])/2)-0.75*3.29, delta_x, min([min(RVp),min(RVs)])]
 upper_bounds = [200, 1, 2*np.pi, JD[0]+((JD[-1]-JD[0])/2)+0.75*3.29, 7, max([max(RVp),max(RVs)])]
 
 #take a walk
@@ -124,13 +129,13 @@ for i in range(6):
     parameters[i] = results[i][0]
 
 #Adjust T
-sampler = lowEFit(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nwalkers, nsteps, 4, parameters)
+T_sampler = lowEFit(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nwalkers, nsteps, 4, parameters)
 
 #save the results of the adjustment
-samples = sampler.chain[:, 2000:, :].reshape((-1, 1))
+T_samples = T_sampler.chain[:, 2000:, :].reshape((-1, 1))
 T_results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
-                              zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
-results[3] = T_results
+                              zip(*np.percentile(T_samples, [16, 50, 84], axis=0)))))
+results[3], parameters[3] = T_results, T_results[0]
 
 #write results to console
 print('Results:')
@@ -142,27 +147,27 @@ print('RMS error: ', residuals([results[0][0], results[1][0], results[2][0],
 #write results to log file
 table = open('log.txt', 'a+')
 labels = ('K', 'e', 'w', 'T', 'P', 'y')
-print(system, " Results:", file = table)
+print('\n' , system, " Results:", file = table)
 print('RMS error: ', residuals([results[0][0], results[1][0], results[2][0],
                                 results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs), file = table)
 print('q  = ', mass_ratio, ' +/-  ', standard_error , file = table)
 for i in range(6):
     print(labels[i], ' = ', results[i][0], ' +', results[i][1], ' -', results[i][2], file = table)
-print('\n')
 table.close()
 
 
-'''
+
 #create the corner plot
 fig = corner.corner(samples, labels=["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"],
                     range=[[lower_bounds[0], upper_bounds[0]], [lower_bounds[1],upper_bounds[1]],
                              [lower_bounds[2], upper_bounds[2]],
                              [lower_bounds[3], upper_bounds[3]], [lower_bounds[4], upper_bounds[4]],
                              [lower_bounds[5], upper_bounds[5]]],
+                    #truths = [parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5]],
                     quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 18})
-#fig.savefig(file + " parameter_results.png")
+plt.savefig(file + ' parameter_results.png')
 
-
+'''
 #create the walkers plot
 fig, ax = plt.subplots(5, 1, sharex='col')
 for i in range(5):
@@ -187,7 +192,7 @@ ax.plot(phases(results[4][0], JDs), RVs, 'rs', label='Secondary RV data')
 ax.set_xlim([0,1])
 plt.title(system)
 plt.savefig(file + ' curve_results.png')
-#plt.show()
+plt.show()
 
 #-------------circular---MCMC---------------#
 '''

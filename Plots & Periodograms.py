@@ -3,8 +3,8 @@ import numpy as np, functions as f
 from matplotlib import pyplot as plt
 from matplotlib import rcParams
 rcParams.update({'figure.autolayout': True})
-file     = 'Systems/DR13/Tables/2M21442066+4211363.tbl'
-data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3))
+file     = 'Systems/DR13/2M17204248+4205070.tbl'
+data       = np.genfromtxt(file, skip_header=1, usecols=(0, 1, 2))
 system         = list(file)
 
 # the string manipulations below extract the 2MASS ID from the file name
@@ -47,8 +47,6 @@ ax.set_ylabel('Primary Velocity (km/s)')#, size='15')
 ax.set_xlabel('Secondary Velocity (km/s)')#, size='15')
 plt.savefig(file + ' mass ratio.png')
 plt.show()
-
-print('mass ratio is ', mass_ratio, "+/-", standard_error, '\nsystemic velocity is ', systemic_velocity)
 
 #check for invalid values
 JDp, RVp = adjustment(JD, RVp)

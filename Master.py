@@ -1,11 +1,11 @@
 #import-libraries-and-data---------------------------------------------------------------------------------------#
-import corner, os, numpy as np, functions as f
+import time, sys, corner, os, numpy as np, functions as f
 from scipy import stats
 from matplotlib import pyplot as plt
 from matplotlib import rcParams
 rcParams.update({'figure.autolayout': True})
-file     = 'Systems/DR13/2M17204248+4205070.tbl'
-data       = np.genfromtxt(file, skip_header=1, usecols=(0, 1, 2))
+file     = 'Systems/DR13/Tables/2M21442066+4211363.tbl'
+data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3))
 system         = list(file)
 
 # the string manipulations below extract the 2MASS ID from the file name
@@ -21,9 +21,10 @@ system = ''.join(system)
 JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [datum[2] for datum in data]
 JDp, JDs        = JD, JD
 samples         = 1000
-max_period      = 7.5
+max_period      = 5
 power_cutoff    = 0.8
 nwalkers, nsteps= 400, 20000
+threads         = 4
 
 #define-functions------------------------------------------------------------------------------------------------#
 
@@ -32,7 +33,7 @@ adjustment, RV, residuals, constraints, MCMC, lowEFit = f.adjustment, f.RV, f.re
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
-#plot Wilkinson plot (mass ratio)
+#plot Wilson plot (mass ratio)
 mass_ratio, intercept, r_squared, standard_error, slope_error = massRatio(RVs,RVp, data)
 systemic_velocity = intercept/(1+mass_ratio)
 
@@ -112,13 +113,14 @@ plt.show()
 #plt.savefig(file + ' RV-phase diagram.png')
 '''
 #-----------------------MCMC------------------------#
+start = time.time() #start timer
 
 #constrain parameters
 lower_bounds = [0, -1, 0, JD[0]+((JD[-1]-JD[0])/2)-0.75*3.29, delta_x, min([min(RVp),min(RVs)])]
-upper_bounds = [200, 1, 2*np.pi, JD[0]+((JD[-1]-JD[0])/2)+0.75*3.29, 7, max([max(RVp),max(RVs)])]
+upper_bounds = [200, 1, 2*np.pi, JD[0]+((JD[-1]-JD[0])/2)+0.75*3.29, max_period, max([max(RVp),max(RVs)])]
 
 #take a walk
-sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 6, nwalkers, nsteps, 4)
+sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 6, nwalkers, nsteps, threads)
 
 #save the results of the walk
 samples = sampler.chain[:, 2000:, :].reshape((-1, 6))
@@ -129,7 +131,7 @@ for i in range(6):
     parameters[i] = results[i][0]
 
 #Adjust T
-T_sampler = lowEFit(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nwalkers, nsteps, 4, parameters)
+T_sampler = lowEFit(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nwalkers, nsteps, threads, parameters)
 
 #save the results of the adjustment
 T_samples = T_sampler.chain[:, 2000:, :].reshape((-1, 1))
@@ -155,7 +157,9 @@ for i in range(6):
     print(labels[i], ' = ', results[i][0], ' +', results[i][1], ' -', results[i][2], file = table)
 table.close()
 
-
+end = time.time() #end timer
+elapsed = end-start
+print('Fitting time was ', int(elapsed), ' seconds.')
 
 #create the corner plot
 fig = corner.corner(samples, labels=["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"],
@@ -192,7 +196,7 @@ ax.plot(phases(results[4][0], JDs), RVs, 'rs', label='Secondary RV data')
 ax.set_xlim([0,1])
 plt.title(system)
 plt.savefig(file + ' curve_results.png')
-plt.show()
+#plt.show()
 
 #-------------circular---MCMC---------------#
 '''

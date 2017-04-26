@@ -112,6 +112,7 @@ def massRatio(x, y, system):
     return -slope, intercept, R2, std_err, slope_err
 
 #returns local maxima above a specified cutoff power
+#not currently in use
 def maxima(cutoff, x, y):
     maxima = np.array([])
     for i in range(1, len(y)-2):
@@ -181,6 +182,7 @@ def probability(initial_guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #l
         return -np.inf
     return -residuals(initial_guess, mass_ratio, RVp, RVs, JDp, JDs)
 
+#This function is used to aid the fitter while it is doing the 1 dimensional T fit
 def goodnessOfFit(fit, parameters, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
     if not lower[3] < fit < upper[3]:
         return -np.inf
@@ -188,6 +190,8 @@ def goodnessOfFit(fit, parameters, mass_ratio, RVp, RVs, JDp, JDs, lower, upper)
     return -residuals(fit, mass_ratio, RVp, RVs, JDp, JDs)
 
 def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalkers, nsteps, cores):
+    
+    ''' deprecated by lowEFit
     #if the fit is circular...
     if ndim == 4:
         del lower_bounds[1:3], upper_bounds[1:3]
@@ -207,10 +211,12 @@ def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalk
                                         args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
         sampler.run_mcmc(position, nsteps)
         return sampler
+    '''
 
     #otherwise, eccentric fit
     initial_guess = initialGuess(lower_bounds, upper_bounds, JDp, RVp)
     position = [initial_guess + 0.1*np.random.randn(ndim) for i in range(nwalkers)]
+    #distribute the walkers around the values given by the initial guesser, in a 'gaussian ball'
     for i in range(nwalkers):
         position[i][0] = initial_guess[0] + 5  *np.random.randn(1) #K
         position[i][1] = initial_guess[1] + 0.1*np.random.randn(1) #e

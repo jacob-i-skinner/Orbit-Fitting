@@ -4,8 +4,8 @@ from scipy import stats
 from matplotlib import pyplot as plt
 from matplotlib import rcParams
 rcParams.update({'figure.autolayout': True})
-file     = 'Systems/DR13/Tables/2M21442066+4211363.tbl'
-data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3))
+file     = 'Systems/4205 chad rvs.txt'
+data       = np.genfromtxt(file, skip_header=1, usecols=(0, 1, 3))
 system         = list(file)
 
 # the string manipulations below extract the 2MASS ID from the file name

@@ -88,10 +88,13 @@ ENV/
 # Rope project settings
 .ropeproject
 
-#Visual Studio Code settings and cache
+# Visual Studio Code settings and cache
 *.vscode
 *.DS_Store
 
-#Plot output from matplotlib
+# Plot output from matplotlib
 *.png
 *.pdf
+
+# Folder containing the data
+Systems/*

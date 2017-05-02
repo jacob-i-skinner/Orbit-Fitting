@@ -29,7 +29,7 @@ threads         = 4
 #define-functions------------------------------------------------------------------------------------------------#
 
 periodogram, dataWindow, maxima, phases, massRatio = f.periodogram, f.dataWindow, f.maxima, f.phases, f.massRatio
-adjustment, RV, residuals, constraints, MCMC, lowEFit = f.adjustment, f.RV, f.residuals, f.constraints, f.MCMC, f.lowEFit
+adjustment, RV, residuals, MCMC, lowEFit = f.adjustment, f.RV, f.residuals, f.MCMC, f.lowEFit
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 

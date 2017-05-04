@@ -4,7 +4,7 @@ from scipy import stats
 from matplotlib import pyplot as plt
 from matplotlib import rcParams
 rcParams.update({'figure.autolayout' : True})
-file     = 'Systems/4205 chad rvs.txt'
+file     = 'Systems/3325.txt'
 data       = np.genfromtxt(file, skip_header=1, usecols=(0, 1, 3))
 system         = list(file)
 
@@ -23,7 +23,7 @@ JDp, JDs        = JD, JD
 samples         = 1000
 max_period      = 5
 power_cutoff    = 0.8
-nwalkers, nsteps= 100, 800000
+nwalkers, nsteps= 100, 480000
 threads         = 4
 
 #define-functions------------------------------------------------------------------------------------------------#
@@ -170,7 +170,7 @@ fig = corner.corner(samples, labels=["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\
                              [lower_bounds[5], upper_bounds[5]]],
                     #truths = [parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5]],
                     quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 18})
-plt.savefig(file + ' parameter_results.png')
+#plt.savefig(file + ' parameter_results.png')
 
 
 #create the walkers plot
@@ -182,7 +182,7 @@ for i in range(6):
 fig.set_figheight(20)
 fig.set_figwidth(15)
 #plt.show()
-plt.savefig(file + ' walk_results.png')
+#plt.savefig(file + ' walk_results.png')
 
 
 #create the curves plot
@@ -197,14 +197,14 @@ ax.plot(phases(results[4][0], JDp), RVp, 'bs', label='Primary RV Data') #data ph
 ax.plot(phases(results[4][0], JDs), RVs, 'rs', label='Secondary RV data')
 ax.set_xlim([0,1])
 plt.title(system)
-plt.savefig(file + ' curve_results.png')
-plt.show()
+#plt.savefig(file + ' curve_results.png')
+#plt.show()
 
-'''
+
 #-------------circular---MCMC---------------#
 
 #take a walk
-sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 4, nwalkers, nsteps, 4)
+sampler = MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 4, nwalkers, nsteps, 4)
 
 #save the results of the walk
 circular_samples = sampler.chain[:, :, :].reshape((-1, 4))
@@ -217,6 +217,17 @@ for i in range(4):
 print('RMS error: ', residuals([results[0][0], results[1][0],
                                 results[2][0], results[3][0]], mass_ratio, RVp, RVs, JDp, JDs))
 
+#write results to log file
+table = open('log.txt', 'a+')
+labels = ('K', 'T', 'P', 'y')
+print('\n' , system, " Results:", file = table)
+print('RMS error: ', residuals([results[0][0], results[1][0], results[2][0],
+                                results[3][0]], mass_ratio, RVp, RVs, JDp, JDs), file = table)
+print('q  = ', mass_ratio, ' +/-  ', standard_error , file = table)
+for i in range(4):
+    print(labels[i], ' = ', results[i][0], ' +', results[i][1], ' -', results[i][2], file = table)
+table.close()
+
 
 #create the corner plot
 fig = corner.corner(circular_samples,labels=['$K$','$T$','$P$','$\gamma$'],
@@ -228,13 +239,13 @@ fig = corner.corner(circular_samples,labels=['$K$','$T$','$P$','$\gamma$'],
 plt.savefig(file + ' no e parameter_results.png')
 
 #create the walkers plot
-#fig, ax = plt.subplots(4, 1, sharex='col')
-#for i in range(4):
-#    for j in range(len(sampler.chain[:, 0, i])):
-#        ax[i].plot(np.linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.2)
-#    ax[i].plot(np.linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*results[i][0], 'b', lw=2)
-#fig.set_figheight(20)
-#fig.set_figwidth(15)
+fig, ax = plt.subplots(4, 1, sharex='col')
+for i in range(4):
+    for j in range(len(sampler.chain[:, 0, i])):
+        ax[i].plot(np.linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.2)
+    ax[i].plot(np.linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*results[i][0], 'b', lw=2)
+fig.set_figheight(20)
+fig.set_figwidth(15)
 #plt.savefig(file + ' no e walk_results.png')
 
 #create the curves plot
@@ -250,4 +261,4 @@ ax.set_xlim([0,1])
 plt.title(residuals([results[0][0], results[1][0],
                      results[2][0], results[3][0]], mass_ratio, RVp, RVs, JDp, JDs))
 plt.savefig(file + ' no e curve_results.png')
-'''
+plt.show()

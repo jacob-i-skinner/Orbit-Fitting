@@ -179,6 +179,11 @@ def constraints(parameters, lower, upper):
 #not technically probability, returns the negative infinity if parameters lie outside contraints, otherwise
 #returns negative of RMS error, emcee tries to maximize this quantity
 def probability(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
+    if len(guess) == 4 :
+        K, T, P, y = guess[0], guess[1], guess[2], guess[3]
+        if not (lower[0] < K < upper[0] and lower[1] < T < upper[1] and lower[2] < P < upper[2] and lower[3] < y < upper[3]):
+            return -np.inf
+        return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
     K, e, w, T, P, y = guess[0], guess[1], guess[2], guess[3], guess[4], guess[5]
     if not (lower[0] < K < upper[0] and -1 < e < 1 and -2*np.pi < w < 2*np.pi and lower[3] < T < upper[3] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
         return -np.inf
@@ -192,9 +197,8 @@ def goodnessOfFit(fit, parameters, mass_ratio, RVp, RVs, JDp, JDs, lower, upper)
     return -residuals(fit, mass_ratio, RVp, RVs, JDp, JDs)
 
 def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalkers, nsteps, cores):
-    '''
     #deprecated by lowEFit, usually
-    #if the fit is circular...
+    #if the fit is assumed to be circular, then ndim = 4, proceed accordingly
     if ndim == 4:
         del lower_bounds[1:3], upper_bounds[1:3]
         initial_guess = initialGuessNoE(lower_bounds, upper_bounds, JDp, RVp)
@@ -203,17 +207,16 @@ def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim
         #walkers distributed in gaussian ball around most likely parameter values
         #coefficients on random samples are proportional to "spread" of values
         for i in range(nwalkers):
-            position[i][0] = initial_guess[0] + 2.5*np.random.randn(1) #K
+            position[i][0] = initial_guess[0] + 5  *np.random.randn(1) #K
             position[i][1] = initial_guess[1] +     np.random.randn(1) #T
             position[i][2] = initial_guess[2] + 2  *np.random.randn(1) #P
-            position[i][3] = initial_guess[3] + 3  *np.random.randn(1) #y
+            position[i][3] = gamma            + 3  *np.random.randn(1) #y
 
         #create the sampler object and take a walk
         sampler = emcee.EnsembleSampler(nwalkers, ndim, probability, a=4.0,
                                         args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
         sampler.run_mcmc(position, nsteps)
         return sampler
-    '''
 
     #otherwise, eccentric fit
     initial_guess = initialGuess(lower_bounds, upper_bounds, JDp, RVp)

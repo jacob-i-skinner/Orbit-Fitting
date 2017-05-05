@@ -127,6 +127,13 @@ T_results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                                 zip(*np.percentile(T_samples, [16, 50, 84], axis=0)))))
 results[3], parameters[3] = T_results, T_results[0]
 
+#if the eccentricity is negative, perform a transformation of the parameters to make it positive
+#add pi to longitude of periastron, and advance time of periastron by period/2
+if results[1][0] < 0:
+    results[1][0], results[2][0], results[3][0] = -results[1][0], results[2][0] + np.pi, results[3][0] + results[4][0]/2
+    results[1][1], results[1][2] = results[1][2], results[1][1] #swap uncertainties of e
+results[2] = results[2] * 180/np.pi #convert longtitude of periastron reporting from radians to degrees
+
 #write results to console
 print('Results:')
 for i in range(6):
@@ -193,6 +200,8 @@ plt.savefig(file + ' curve_results.png')
 
 #-------------circular---MCMC---------------#
 
+start = time.time() #start timer
+
 #take a walk
 sampler = MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 4, nwalkers, nsteps, 4)
 
@@ -218,6 +227,10 @@ for i in range(4):
     print(labels[i], ' = ', results[i][0], ' +', results[i][1], ' -', results[i][2], file = table)
 table.close()
 
+#end timer
+end = time.time()
+elapsed = end-start
+print('Fitting time was ', int(elapsed), ' seconds.')
 
 #create the corner plot
 fig = corner.corner(circular_samples,labels=['$K$','$T$','$P$','$\gamma$'],
@@ -251,4 +264,4 @@ ax.set_xlim([0,1])
 plt.title(residuals([results[0][0], results[1][0],
                      results[2][0], results[3][0]], mass_ratio, RVp, RVs, JDp, JDs))
 plt.savefig(file + ' no e curve_results.png')
-plt.show()
+#plt.show()

@@ -199,7 +199,7 @@ def probability(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
             return -inf
         return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
     K, e, w, T, P, y = guess[0], guess[1], guess[2], guess[3], guess[4], guess[5]
-    if not (lower[0] < K < upper[0] and -1 < e < 1 and -2*pi < w < 2*pi and lower[3] < T < upper[3] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
+    if not (lower[0] < K < upper[0] and -1 < e < 1 and -2*pi < w < 2*pi and JD_median-0.75*guess[4] < T < JD_median+0.75*guess[4] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
         return -inf
     return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
 

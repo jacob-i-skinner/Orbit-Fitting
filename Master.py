@@ -1,8 +1,7 @@
 #import-libraries-and-data---------------------------------------------------------------------------------------#
-import time, sys, corner, os, numpy as np, functions as f
-from scipy import stats
-from matplotlib import pyplot as plt
-from matplotlib import rcParams
+import sys, os, numpy as np, functions as f
+#from scipy import stats
+from matplotlib import pyplot as plt, rcParams
 rcParams.update({'figure.autolayout' : True})
 file     = 'Systems/3325.txt'
 data       = np.genfromtxt(file, skip_header=1, usecols=(0, 1, 3))
@@ -22,8 +21,7 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 JDp, JDs        = JD, JD
 samples         = 1000
 max_period      = 5
-power_cutoff    = 0.8
-nwalkers, nsteps= 100, 480000
+nwalkers, nsteps= 100,10000
 threads         = 4
 
 #define-functions------------------------------------------------------------------------------------------------#
@@ -98,26 +96,16 @@ ax.set_ylim(0,1)
 ax.set_xlim(delta_x,max_period)
 ax.set_title(system)
 plt.savefig(file + ' adjusted periodogram.png')
-plt.show()
-'''
-#plot phased RVs
-fig = plt.figure(figsize=(8,3))
-ax = plt.subplot(111)
-ax.plot(phases(maxima(power_cutoff, x, y*y2)[2], JDp), RVp, 'k.')
-ax.plot(phases(maxima(power_cutoff, x, y*y2)[2], JDs), RVs, 'r.')
-ax.plot(phases(maxima(power_cutoff, x, y*y2)[2], JDp), systemic_velocity*np.ones(len(JDp)))
-ax.set_title('Period: %s days' %(maxima(power_cutoff, x, y*y2)[2]))
-ax.set_xlabel('Orbital Phase', size='15')
-ax.set_ylabel('Radial Velocity', size='20')
-plt.show()
-#plt.savefig(file + ' RV-phase diagram.png')
-'''
+#plt.show()
+
 #-----------------------MCMC------------------------#
+
+import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, -1, 0, JD[0]+((JD[-1]-JD[0])/2)-0.75*3.29, delta_x, min(min(RVs), min(RVp))]
-upper_bounds = [200, 1, 2*np.pi, JD[0]+((JD[-1]-JD[0])/2)+0.75*3.29, max_period, max(max(RVs), max(RVp))]
+lower_bounds = [0, -1, 0, np.median(np.asarray(JD))-0.5*max_period, delta_x, min(min(RVs), min(RVp))]
+upper_bounds = [200, 1, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, max_period, max(max(RVs), max(RVp))]
 
 #take a walk
 sampler = MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 6, nwalkers, nsteps, threads)
@@ -163,6 +151,7 @@ elapsed = end-start
 print('Fitting time was ', int(elapsed), ' seconds.')
 
 #create the corner plot
+import corner
 fig = corner.corner(samples, labels=["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"],
                     range=[[lower_bounds[0], upper_bounds[0]], [lower_bounds[1],upper_bounds[1]],
                              [lower_bounds[2], upper_bounds[2]],
@@ -170,19 +159,20 @@ fig = corner.corner(samples, labels=["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\
                              [lower_bounds[5], upper_bounds[5]]],
                     #truths = [parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5]],
                     quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 18})
-#plt.savefig(file + ' parameter_results.png')
+plt.savefig(file + ' parameter_results.png')
 
-
+    
+linspace = np.linspace
 #create the walkers plot
 fig, ax = plt.subplots(6, 1, sharex='col')
 for i in range(6):
     for j in range(len(sampler.chain[:, 0, i])):
-        ax[i].plot(np.linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.2)
-    ax[i].plot(np.linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*results[i][0], 'b', lw=2)
+        ax[i].plot(linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.2)
+    ax[i].plot(linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*results[i][0], 'b', lw=2)
 fig.set_figheight(20)
 fig.set_figwidth(15)
 #plt.show()
-#plt.savefig(file + ' walk_results.png')
+plt.savefig(file + ' walk_results.png')
 
 
 #create the curves plot
@@ -197,7 +187,7 @@ ax.plot(phases(results[4][0], JDp), RVp, 'bs', label='Primary RV Data') #data ph
 ax.plot(phases(results[4][0], JDs), RVs, 'rs', label='Secondary RV data')
 ax.set_xlim([0,1])
 plt.title(system)
-#plt.savefig(file + ' curve_results.png')
+plt.savefig(file + ' curve_results.png')
 #plt.show()
 
 
@@ -242,11 +232,11 @@ plt.savefig(file + ' no e parameter_results.png')
 fig, ax = plt.subplots(4, 1, sharex='col')
 for i in range(4):
     for j in range(len(sampler.chain[:, 0, i])):
-        ax[i].plot(np.linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.2)
-    ax[i].plot(np.linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*results[i][0], 'b', lw=2)
+        ax[i].plot(linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.2)
+    ax[i].plot(linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*results[i][0], 'b', lw=2)
 fig.set_figheight(20)
 fig.set_figwidth(15)
-#plt.savefig(file + ' no e walk_results.png')
+plt.savefig(file + ' no e walk_results.png')
 
 #create the curves plot
 x = np.linspace(0, 15.8, num=nsteps)

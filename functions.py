@@ -1,11 +1,15 @@
-import numpy as np, emcee
-from scipy import stats
+import numpy as np
 from matplotlib import pyplot as plt
-from scipy.optimize import curve_fit
-from scipy.signal import lombscargle
 
 #returns RV values over a time interval, of a curve from given parameters
 #x is an array-like representing samples from a time interval, mass_ratio is a float, parameters is a 6 element list
+pi      = np.pi
+sin     = np.sin
+cos     = np.cos
+tan     = np.tan
+arctan  = np.arctan
+amax    = np.amax
+sqrt    = np.sqrt
 def RV(x, mass_ratio, parameters):
     #if orbit is assumed circular (4 elements passed) add zeroes for e and omega values
     #into parameter list
@@ -15,22 +19,23 @@ def RV(x, mass_ratio, parameters):
     check = 1 #this variable is used to prevent the while loop from continuing infinitely,
               #if the error in the has reached a lower limit above the specified 1e-9, the check provides an escape from the loop
     K, e, w, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5]
-    M = (2*np.pi/P)*(x-T) #Mean Anomaly is a function of time
-    E1 = M + e*np.sin(M) + ((e**2)*np.sin(2*M)/2) #Eccentric Anomaly is a function of Mean Anomaly
+    M = (2*pi/P)*(x-T) #Mean Anomaly is a function of time
+    E1 = M + e*sin(M) + ((e**2)*sin(2*M)/2) #Eccentric Anomaly is a function of Mean Anomaly
     while True: #iteratively refines estimate of E1 from initial estimate
         E0    = E1
-        M0    = E0 - e*np.sin(E0)
-        E1    = E0 +(M-M0)/(1-e*np.cos(E0))
+        M0    = E0 - e*sin(E0)
+        E1    = E0 +(M-M0)/(1-e*cos(E0))
         #this loop is 
-        if np.amax(E1-E0) < 1e-9 or check-np.amax(E1-E0) == 0:
+        if amax(E1-E0) < 1e-9 or check-amax(E1-E0) == 0:
             break
         else:
-            check = np.amax(E1-E0)
-    nu = 2*np.arctan(np.sqrt((1 + e)/(1 - e))*np.tan(E1/2)) #True Anomaly is a function of Eccentric anomaly
-    p, s = (K*(np.cos(nu+w) + (e*np.cos(w)))+y), ((-K/mass_ratio)*(np.cos(nu+w) + (e*np.cos(w)))+y) 
+            check = amax(E1-E0)
+    nu = 2*arctan(sqrt((1 + e)/(1 - e))*tan(E1/2)) #True Anomaly is a function of Eccentric anomaly
+    p, s = (K*(cos(nu+w) + (e*cos(w)))+y), ((-K/mass_ratio)*(cos(nu+w) + (e*cos(w)))+y) 
     return p, s
 
 #This periodogram function was adapted from Jake Vanderplas' article "Fast Lomb-Scargle Periodograms in Python"
+from scipy.signal import lombscargle
 def periodogram(x, rv, f, max_period):
     x = np.array(x)
     rv = np.array(rv)
@@ -45,7 +50,7 @@ def periodogram(x, rv, f, max_period):
     # if specifiying one hour limit, use 0.04167 instead of delta_x
 
     # convert period range into frequency range
-    ang_freqs = 2 * np.pi / periods
+    ang_freqs = 2 * pi / periods
 
     # compute the (unnormalized) periodogram
     # note pre-centering of y values!
@@ -70,7 +75,7 @@ def dataWindow(x, f, max_period):
     #one hour limit - 0.04167
 
     # convert period range into frequency range
-    ang_freqs = 2 * np.pi / periods
+    ang_freqs = 2 * pi / periods
 
     # compute the (unnormalized) periodogram
     # y values are all 1
@@ -101,6 +106,7 @@ def phases(P, times):
     return phased_Times
 
 #returns mass ratio, and another of values related to the linear fit
+from scipy import stats
 def massRatio(x, y, system):
     y = [datum[1] for datum in system if not np.isnan(datum[1]+datum[2])] #primary component
     x = [datum[2] for datum in system if not np.isnan(datum[1]+datum[2])] #secondary
@@ -121,36 +127,38 @@ def maxima(cutoff, x, y):
     return maxima
 
 #provides starting point for the MCMC, returns parameters (within the specified bounds) from a simple but fast fit
+from scipy.optimize import curve_fit
 def initialGuess(lower, upper, JDp, RVp):
     #initialGuess is a simple fitter, so alteredRV exists to return just the primary curve
     def alteredRV(x, K, e, w, T, P, y): #different argument structure accomodates scipy.curve_fit
         check = 1
-        M = (2*np.pi/P)*(x-T)
-        E1 = M + e*np.sin(M) + ((e**2)*np.sin(2*M)/2)
+        M = (2*pi/P)*(x-T)
+        E1 = M + e*sin(M) + ((e**2)*sin(2*M)/2)
         while True:
             E0 = E1
-            M0 = E0 - e*np.sin(E0)
-            E1 = E0 +(M-M0)/(1-e*np.cos(E0))
-            if np.amax(E1-E0) < 1e-9 or check-np.amax(E1-E0) == 0:
+            M0 = E0 - e*sin(E0)
+            E1 = E0 +(M-M0)/(1-e*cos(E0))
+            if amax(E1-E0) < 1e-9 or check-amax(E1-E0) == 0:
                 break
             else:
-                check = np.amax(E1-E0)
-        nu = 2*np.arctan(np.sqrt((1 + e)/(1 - e))*np.tan(E1/2))
-        p = ((K)*(np.cos(nu+w) + (e*np.cos(w)))+y)
+                check = amax(E1-E0)
+        nu = 2*arctan(np.sqrt((1 + e)/(1 - e))*tan(E1/2))
+        p = ((K)*(cos(nu+w) + (e*cos(w)))+y)
         return p
     return curve_fit(alteredRV, JDp, np.asarray(RVp), bounds=(lower, upper))[0]
 
 #same as initialGuess, but for the special case of a circular orbit.
 def initialGuessNoE(lower, upper, JDp, RVp):
     def alteredNoERV(x, K, T, P, y):
-        return K*np.cos((2*np.pi*x/P)+T)+y
+        return K*cos((2*pi*x/P)+T)+y
     return curve_fit(alteredNoERV, JDp, np.asarray(RVp), bounds=(lower, upper))[0]
 
 #returns the residual error of the data w.r.t. a particular fit
 #is now a properly "normalized" RMS error
+asarray = np.asarray
 def residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs):
-    r = np.sqrt(sum((np.asarray(RVp)-RV(JDp, mass_ratio, parameters)[0])**2)/(len(RVp))
-        +sum((np.asarray(RVs)-RV(JDs, mass_ratio, parameters)[1])**2)/(len(RVs)))
+    r = sqrt(sum((asarray(RVp)-RV(JDp, mass_ratio, parameters)[0])**2)/(len(RVp))
+        +sum((asarray(RVs)-RV(JDs, mass_ratio, parameters)[1])**2)/(len(RVs)))
     return r
 
 #returns the coefficient of determination for a particular fit
@@ -171,31 +179,38 @@ def constraints(parameters, lower, upper):
             return 0
         return -np.inf
     K, e, w, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5]
-    if  lower[0] < K < upper[0] and -1 < e < 1 and -2*np.pi < w < 2*np.pi and lower[3] < T < upper[3] and lower[4] < P < upper[4] and lower[5] < y < upper[5]:
+    if  lower[0] < K < upper[0] and -1 < e < 1 and -2*pi < w < 2*pi and lower[3] < T < upper[3] and lower[4] < P < upper[4] and lower[5] < y < upper[5]:
         return 0
     return -np.inf
 '''
 
 #not technically probability, returns the negative infinity if parameters lie outside contraints, otherwise
 #returns negative of RMS error, emcee tries to maximize this quantity
+
+append  = np.append
+median  = np.median
+inf     = np.inf
 def probability(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
+    JD_median = median(append(JDs, JDp))
     if len(guess) == 4 :
         K, T, P, y = guess[0], guess[1], guess[2], guess[3]
-        if not (lower[0] < K < upper[0] and lower[1] < T < upper[1] and lower[2] < P < upper[2] and lower[3] < y < upper[3]):
-            return -np.inf
+        if not (lower[0] < K < upper[0] and JD_median-0.75*guess[2] < T < JD_median+0.75*guess[2] and lower[2] < P < upper[2] and lower[3] < y < upper[3]):
+        #if not (lower[0] < K < upper[0] and lower[1] < T < upper[1] and lower[2] < P < upper[2] and lower[3] < y < upper[3]):
+            return -inf
         return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
     K, e, w, T, P, y = guess[0], guess[1], guess[2], guess[3], guess[4], guess[5]
-    if not (lower[0] < K < upper[0] and -1 < e < 1 and -2*np.pi < w < 2*np.pi and lower[3] < T < upper[3] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
-        return -np.inf
+    if not (lower[0] < K < upper[0] and -1 < e < 1 and -2*pi < w < 2*pi and lower[3] < T < upper[3] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
+        return -inf
     return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
 
 #This function is used to aid the fitter while it is doing the 1 dimensional T fit
 def goodnessOfFit(fit, parameters, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
     if not lower[3] < fit < upper[3]:
-        return -np.inf
+        return -inf
     fit = [parameters[0], parameters[1], parameters[2], fit, parameters[4], parameters[5]]
     return -residuals(fit, mass_ratio, RVp, RVs, JDp, JDs)
 
+import emcee
 def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalkers, nsteps, cores):
     #deprecated by lowEFit, usually
     #if the fit is assumed to be circular, then ndim = 4, proceed accordingly

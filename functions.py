@@ -171,6 +171,45 @@ def rSquared(parameters, mass_ratio, RVp, RVs, JDp, JDs):
 #the functions below are either the MCMC itself, or critical support functions
 #they were adapted from the "fitting a model to data" example by Dan Foreman-Mackey, on the emcee website
 
+#create the walkers plot
+def walkers(file, nsteps, ndim, sampler, results):
+    linspace = np.linspace
+    walk = sampler
+    ones = np.ones
+    fig, ax = plt.subplots(ndim, 1, sharex='col')
+    for i in range(ndim):
+        for j in range(len(walk.chain[:, 0, i])):
+            ax[i].plot(linspace(0, nsteps, num=nsteps), walk.chain[j, :, i], 'k', alpha=0.2)
+        if i == 2 and ndim == 6:
+            ax[i].plot(linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*results[i][0]*(pi/180), 'b', lw=2)    
+        else:
+             ax[i].plot(linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*results[i][0], 'b', lw=2)
+    fig.set_figheight(20)
+    fig.set_figwidth(15)
+    #plt.show()
+    plt.savefig(file + ' %s dimension walk results.png'%(ndim))
+    return
+
+def corner(file, ndim, samples, lower_bounds, upper_bounds, parameters):
+    import corner
+    points = samples
+    truths = parameters
+    if ndim == 4:
+        bounds, titles = [[lower_bounds[0], upper_bounds[0]],
+                          [lower_bounds[1], upper_bounds[1]],
+                          [lower_bounds[2], upper_bounds[2]],
+                          [lower_bounds[3], upper_bounds[3]]], ["$K$", "$T$", "$P$", "$\gamma$"]
+
+    elif ndim == 6:
+        bounds, titles = [[lower_bounds[0], upper_bounds[0]], [lower_bounds[1], upper_bounds[1]],
+                          [lower_bounds[2], upper_bounds[2]], [lower_bounds[3], upper_bounds[3]],
+                          [lower_bounds[4], upper_bounds[4]], [lower_bounds[5], upper_bounds[5]]], ["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"]
+
+    fig = corner.corner(points, bins = 40, range = bounds, labels = titles, smooth = 0.8,
+                        truths = truths,
+                        quantiles=[0.16, 0.84], show_titles = True, title_kwargs = {"fontsize": 18})
+    plt.savefig(file + ' %s dimension parameter results.png'%(ndim))
+
 '''
 def constraints(parameters, lower, upper):
     if len(parameters) == 4:
@@ -194,64 +233,67 @@ def probability(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
     JD_median = median(append(JDs, JDp))
     if len(guess) == 4 :
         K, T, P, y = guess[0], guess[1], guess[2], guess[3]
-        if not (lower[0] < K < upper[0] and JD_median-0.75*guess[2] < T < JD_median+0.75*guess[2] and lower[2] < P < upper[2] and lower[3] < y < upper[3]):
+        if not (lower[0] < K < upper[0] and JD_median-0.5*guess[2] < T < JD_median+0.5*guess[2] and lower[2] < P < upper[2] and lower[3] < y < upper[3]):
         #if not (lower[0] < K < upper[0] and lower[1] < T < upper[1] and lower[2] < P < upper[2] and lower[3] < y < upper[3]):
             return -inf
         return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
     K, e, w, T, P, y = guess[0], guess[1], guess[2], guess[3], guess[4], guess[5]
-    if not (lower[0] < K < upper[0] and -1 < e < 1 and -2*pi < w < 2*pi and JD_median-0.75*guess[4] < T < JD_median+0.75*guess[4] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
+    if not (lower[0] < K < upper[0] and -1 < e < 1 and 0 < w < 2*pi and JD_median-0.5*guess[4] < T < JD_median+0.5*guess[4] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
         return -inf
     return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
 
 #This function is used to aid the fitter while it is doing the 1 dimensional T fit
-def goodnessOfFit(fit, parameters, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
-    if not lower[3] < fit < upper[3]:
+def goodnessOfFit(T, parameters, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
+    JD_median = median(append(JDs, JDp))
+    if not JD_median-0.5*parameters[4] < T < JD_median+0.5*parameters[4]:
         return -inf
-    fit = [parameters[0], parameters[1], parameters[2], fit, parameters[4], parameters[5]]
+    fit = [parameters[0], parameters[1], parameters[2], T, parameters[4], parameters[5]]
     return -residuals(fit, mass_ratio, RVp, RVs, JDp, JDs)
 
 import emcee
 def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalkers, nsteps, cores):
+    random = np.random.randn
     #deprecated by lowEFit, usually
     #if the fit is assumed to be circular, then ndim = 4, proceed accordingly
     if ndim == 4:
         del lower_bounds[1:3], upper_bounds[1:3]
         initial_guess = initialGuessNoE(lower_bounds, upper_bounds, JDp, RVp)
         #initialize walkers 
-        position = [initial_guess + 0.1*np.random.randn(ndim) for i in range(nwalkers)]
+        position = [initial_guess + 0.1*random(ndim) for i in range(nwalkers)]
         #walkers distributed in gaussian ball around most likely parameter values
         #coefficients on random samples are proportional to "spread" of values
         for i in range(nwalkers):
-            position[i][0] = initial_guess[0] + 5  *np.random.randn(1) #K
-            position[i][1] = initial_guess[1] +     np.random.randn(1) #T
-            position[i][2] = initial_guess[2] + 2  *np.random.randn(1) #P
-            position[i][3] = gamma            + 3  *np.random.randn(1) #y
+            position[i][0] = initial_guess[0] + 4  *random(1) #K
+            position[i][1] = initial_guess[1] +     random(1) #T
+            position[i][2] = initial_guess[2] +     random(1) #P
+            position[i][3] = gamma            + 3  *random(1) #y
 
         #create the sampler object and take a walk
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, probability, a=4.0,
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, probability, a=2.0,
                                         args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
         sampler.run_mcmc(position, nsteps)
         return sampler
 
     #otherwise, eccentric fit
     initial_guess = initialGuess(lower_bounds, upper_bounds, JDp, RVp)
-    position = [initial_guess + 0.1*np.random.randn(ndim) for i in range(nwalkers)]
+    position = [initial_guess + 0.1*random(ndim) for i in range(nwalkers)]
     #distribute the walkers around the values given by the initial guesser, in a 'gaussian ball'
     for i in range(nwalkers):
-        position[i][0] = initial_guess[0] + 5  *np.random.randn(1) #K
-        position[i][1] = initial_guess[1] + 0.1*np.random.randn(1) #e
-        position[i][2] = initial_guess[2] +     np.random.randn(1) #w
-        position[i][3] = initial_guess[3] +     np.random.randn(1) #T
-        position[i][4] = initial_guess[4] + 2  *np.random.randn(1) #P
-        position[i][5] = gamma            + 3  *np.random.randn(1) #y
+        position[i][0] = initial_guess[0] + 4  *random(1) #K
+        position[i][1] = 0                +0.05*random(1) #e
+        position[i][2] = initial_guess[2] +     random(1) #w
+        position[i][3] = initial_guess[3] +     random(1) #T
+        position[i][4] = initial_guess[4] +     random(1) #P
+        position[i][5] = gamma            + 3  *random(1) #y
     sampler = emcee.EnsembleSampler(nwalkers, ndim, probability, a=4.0,
                                     args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
     sampler.run_mcmc(position, nsteps)
     return sampler
 
 def lowEFit(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nwalkers, nsteps, cores, parameters):
-    initial_guess = parameters
-    position = [initial_guess[3] + np.random.randn(1) for i in range(nwalkers)]
+    initial_results = parameters
+    random = np.random.randn
+    position = [initial_results[3] + random(1) for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, 1, goodnessOfFit, a=4.0,
                                     args=(parameters, mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
     sampler.run_mcmc(position, nsteps)

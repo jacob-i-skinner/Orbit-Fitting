@@ -2,8 +2,8 @@ import numpy as np, functions as f
 from matplotlib import pyplot as plt
 from matplotlib import rcParams
 rcParams.update({'figure.autolayout': True})
-file     = 'Systems/DR13/Tables/2M10464238+1626144.tbl'
-data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3))
+file     = 'Systems/4205.txt'
+data       = np.genfromtxt(file, skip_header=1, usecols=(0, 1, 3))
 system         = list(file)
 
 # the string manipulations below extract the 2MASS ID from the file name

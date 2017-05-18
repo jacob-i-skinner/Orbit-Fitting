@@ -2,8 +2,8 @@ import numpy as np, functions as f
 from matplotlib import pyplot as plt
 from matplotlib import rcParams
 rcParams.update({'figure.autolayout': True})
-file     = 'Systems/4205.txt'
-data       = np.genfromtxt(file, skip_header=1, usecols=(0, 1, 3))
+file     = 'Systems/Deshpande_List/2M06115599+3325505.tbl'
+data       = np.genfromtxt(file, skip_header=1, usecols=(0, 1, 2))
 system         = list(file)
 
 # the string manipulations below extract the 2MASS ID from the file name
@@ -28,8 +28,8 @@ JDs, RVs = adjustment(JD, RVs)
 
 #----------------------------------------------------------------------------------------------------#
 
-mass_ratio, parameters = 0.643986286319,[44.5872606179, 0.00355422130935, 0.349973460973,
-                                         2456177.21239, 3.28579281142, -7.05424261248]
+mass_ratio, parameters = 0.7,[32.1675062656, 0.2, 0,
+                                         2456260.80134, 2.6320929857, 70]
 #----------------------------------------------------------------------------------------------------#
 
 x = np.linspace(0, 15.8, num=nsteps)
@@ -38,11 +38,11 @@ primary, secondary = RV(x, mass_ratio, parameters)
 ax.plot(x/parameters[4], primary, 'b', lw=2)
 ax.plot(x/parameters[4], secondary, 'r', lw=2)
 ax.plot(x, np.ones(len(x))*parameters[5], 'k' , label='Systemic Velocity')
-ax.plot(phases(parameters[4], JDp), RVp, 'bs', label='Primary RV Data') #data phased to result period
-ax.plot(phases(parameters[4], JDs), RVs, 'rs', label='Secondary RV data')
-ax.set_xlabel('Orbital Phase')
-ax.set_ylabel('Radail Velocity $\\frac{km}{s}$')
+#ax.plot(phases(parameters[4], JDp), RVp, 'bs', label='Primary RV Data') #data phased to result period
+#ax.plot(phases(parameters[4], JDs), RVs, 'rs', label='Secondary RV data')
+plt.xlabel('Orbital Phase', fontsize = 18)
+plt.ylabel('Radial Velocity $\\frac{km}{s}$', fontsize = 18)
 ax.set_xlim([0,1])
-plt.title(system)
-#plt.savefig(file + ' curve_results.png')
+#plt.title('Radial Velocity Curve for 2M06115599+3325505', fontsize = 18)
+plt.savefig(file + ' curve_results.png')
 plt.show()

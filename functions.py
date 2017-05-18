@@ -176,17 +176,20 @@ def walkers(file, nsteps, ndim, sampler, results):
     linspace = np.linspace
     walk = sampler
     ones = np.ones
+    label= ['$K$', '$e$', '$\omega$', '$T$', '$P$', '$\gamma$']
+    if ndim == 4:
+        del label[1:3]
     fig, ax = plt.subplots(ndim, 1, sharex='col')
     for i in range(ndim):
         for j in range(len(walk.chain[:, 0, i])):
             ax[i].plot(linspace(0, nsteps, num=nsteps), walk.chain[j, :, i], 'k', alpha=0.2)
-        if i == 2 and ndim == 6:
-            ax[i].plot(linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*results[i][0]*(pi/180), 'b', lw=2)    
-        else:
-             ax[i].plot(linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*results[i][0], 'b', lw=2)
+        ax[i].plot(linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*results[i][0], 'b', lw=2)
+        ax[i].set_ylabel(label[i], rotation = 0, fontsize = 18)
+        ax[i].yaxis.set_label_coords(-0.06, 0.5)
+    plt.xlabel('Step Number', fontsize = 18)
+    ax[0].set_title('Walker Positions During Random Walk', fontsize = 18)
     fig.set_figheight(20)
     fig.set_figwidth(15)
-    #plt.show()
     plt.savefig(file + ' %s dimension walk results.png'%(ndim))
     return
 
@@ -209,7 +212,7 @@ def corner(file, ndim, samples, lower_bounds, upper_bounds, parameters):
                         truths = truths,
                         quantiles=[0.16, 0.84], show_titles = True, title_kwargs = {"fontsize": 18})
     plt.savefig(file + ' %s dimension parameter results.png'%(ndim))
-
+    return
 '''
 def constraints(parameters, lower, upper):
     if len(parameters) == 4:
@@ -229,8 +232,11 @@ def constraints(parameters, lower, upper):
 append  = np.append
 median  = np.median
 inf     = np.inf
-def probability(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
+step    = 0
+def probability(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper, nsteps, nwalkers): #lnprob
     JD_median = median(append(JDs, JDp))
+    global step
+    
     if len(guess) == 4 :
         K, T, P, y = guess[0], guess[1], guess[2], guess[3]
         if not (lower[0] < K < upper[0] and JD_median-0.5*guess[2] < T < JD_median+0.5*guess[2] and lower[2] < P < upper[2] and lower[3] < y < upper[3]):
@@ -239,7 +245,10 @@ def probability(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
         return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
     K, e, w, T, P, y = guess[0], guess[1], guess[2], guess[3], guess[4], guess[5]
     if not (lower[0] < K < upper[0] and -1 < e < 1 and 0 < w < 2*pi and JD_median-0.5*guess[4] < T < JD_median+0.5*guess[4] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
+        step += 1
         return -inf
+    step += 1
+    print(round(400*step/(nwalkers*nsteps), 2), '% complete')
     return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
 
 #This function is used to aid the fitter while it is doing the 1 dimensional T fit
@@ -247,8 +256,7 @@ def goodnessOfFit(T, parameters, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): 
     JD_median = median(append(JDs, JDp))
     if not JD_median-0.5*parameters[4] < T < JD_median+0.5*parameters[4]:
         return -inf
-    fit = [parameters[0], parameters[1], parameters[2], T, parameters[4], parameters[5]]
-    return -residuals(fit, mass_ratio, RVp, RVs, JDp, JDs)
+    return -residuals([parameters[0], parameters[1], parameters[2], T, parameters[4], parameters[5]], mass_ratio, RVp, RVs, JDp, JDs)
 
 import emcee
 def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalkers, nsteps, cores):
@@ -270,7 +278,7 @@ def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim
 
         #create the sampler object and take a walk
         sampler = emcee.EnsembleSampler(nwalkers, ndim, probability, a=2.0,
-                                        args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
+                                        args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nsteps, nwalkers), threads=cores)
         sampler.run_mcmc(position, nsteps)
         return sampler
 
@@ -286,7 +294,7 @@ def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim
         position[i][4] = initial_guess[4] +     random(1) #P
         position[i][5] = gamma            + 3  *random(1) #y
     sampler = emcee.EnsembleSampler(nwalkers, ndim, probability, a=4.0,
-                                    args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
+                                    args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nsteps, nwalkers), threads=cores)
     sampler.run_mcmc(position, nsteps)
     return sampler
 

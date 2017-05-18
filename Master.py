@@ -3,8 +3,8 @@ import sys, os, numpy as np, functions as f
 #from scipy import stats
 from matplotlib import pyplot as plt, rcParams
 rcParams.update({'figure.autolayout' : True})
-file     = 'Systems/4205.txt'
-data       = np.genfromtxt(file, skip_header=1, usecols=(0, 1, 3))
+file     = 'Systems/Deshpande_List/2M21442066+4211363.tbl'
+data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3))
 system         = list(file)
 
 # the string manipulations below extract the 2MASS ID from the file name
@@ -21,7 +21,7 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 JDp, JDs        = JD, JD
 samples         = 1000
 max_period      = 5
-nwalkers, nsteps= 1000, 20000 #minimum nwalker: 14, minimum nsteps determined by the convergenve cutoff
+nwalkers, nsteps= 2000, 20000 #minimum nwalker: 14, minimum nsteps determined by the convergenve cutoff
 cutoff          = 5000
 
 if 6 * nwalkers * nsteps * 4 >= 20*10**9:
@@ -44,7 +44,7 @@ ax.plot(RVs, RVp, 'k.')
 x, y = np.array([np.nanmin(RVs), np.nanmax(RVs)]),-mass_ratio*np.array([np.nanmin(RVs), 
                                                                         np.nanmax(RVs)])+intercept
 ax.plot(x, y)
-ax.set_title(system)
+ax.set_title('Wilson plot for 2M17204248+4205070')
 ax.text(0, 20, 'q = %s $\pm$ %s\n$\gamma$ = %s $\\frac{km}{s}$' %(np.round(mass_ratio, decimals = 3), np.round(standard_error, decimals = 3),
                                                      np.round(gamma, decimals = 3)))
 ax.set_ylabel('Primary Velocity (km/s)')#, size='15')
@@ -181,8 +181,11 @@ ax.plot(x, np.ones(len(x))*results[5][0], 'k' , label='Systemic Velocity')
 ax.plot(phases(results[4][0], JDp), RVp, 'bs', label='Primary RV Data') #data phased to result period
 ax.plot(phases(results[4][0], JDs), RVs, 'rs', label='Secondary RV data')
 ax.set_xlim([0,1])
-plt.title(residuals([results[0][0], results[1][0], results[2][0],
-                     results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs))
+plt.xlabel('Orbital Phase', fontsize = 18)
+plt.ylabel('Radial Velocity $\\frac{km}{s}$', fontsize = 18)
+plt.title('Radial Velocity Curve', fontsize = 18)
+#plt.title(residuals([results[0][0], results[1][0], results[2][0],
+#                     results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs))
 plt.savefig(file + ' curve_results.png')
 #plt.show()
 
@@ -193,6 +196,7 @@ corner(file, 6, samples, lower_bounds, upper_bounds, parameters)
 walkers(file, nsteps, 6, sampler, results)
 
 del samples
+
 
 #-------------circular---MCMC---------------#
 
@@ -246,8 +250,11 @@ ax.plot(x, np.ones(len(x))*results[3][0], 'k' , label='Systemic Velocity')
 ax.plot(phases(results[2][0], JDp), RVp, 'bs', label='Primary RV Data') #data phased to result period
 ax.plot(phases(results[2][0], JDs), RVs, 'rs', label='Secondary RV data')
 ax.set_xlim([0,1])
-plt.title(residuals([results[0][0], results[1][0],
-                     results[2][0], results[3][0]], mass_ratio, RVp, RVs, JDp, JDs))
+plt.xlabel('Orbital Phase', fontsize = 18)
+plt.ylabel('Radial Velocity $\\frac{km}{s}$', fontsize = 18)
+plt.title('Radial Velocity Curve', fontsize = 18)
+#plt.title(residuals([results[0][0], results[1][0],
+#                     results[2][0], results[3][0]], mass_ratio, RVp, RVs, JDp, JDs))
 plt.savefig(file + ' no e curve_results.png')
 
 #create the corner plot

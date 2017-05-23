@@ -1,6 +1,8 @@
 #import-libraries-and-data---------------------------------------------------------------------------------------#
-import sys, os, numpy as np, functions as f
-#from scipy import stats
+import os
+import numpy as np
+import functions as f
+
 from matplotlib import pyplot as plt, rcParams
 rcParams.update({'figure.autolayout' : True})
 file     = 'Systems/Deshpande_List/2M21442066+4211363.tbl'
@@ -21,7 +23,7 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 JDp, JDs        = JD, JD
 samples         = 1000
 max_period      = 5
-nwalkers, nsteps= 2000, 20000 #minimum nwalker: 14, minimum nsteps determined by the convergenve cutoff
+nwalkers, nsteps= 5000, 20000 #minimum nwalker: 14, minimum nsteps determined by the convergenve cutoff
 cutoff          = 5000
 
 if 6 * nwalkers * nsteps * 4 >= 20*10**9:
@@ -171,7 +173,7 @@ elapsed = end-start
 print('Fitting time was ', int(elapsed), ' seconds.')
 
 #create the curves plot
-x = np.linspace(0, 15.8, num=1000)
+x = np.linspace(0, parameters[4], num=1000)
 fig, ax = plt.figure(figsize=(15,8)), plt.subplot(111)
 primary, secondary = RV(x, mass_ratio, [results[0][0], results[1][0], results[2][0],
                                         results[3][0], results[4][0], results[5][0]])
@@ -187,7 +189,7 @@ plt.title('Radial Velocity Curve', fontsize = 18)
 #plt.title(residuals([results[0][0], results[1][0], results[2][0],
 #                     results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs))
 plt.savefig(file + ' curve_results.png')
-#plt.show()
+plt.show()
 
 #create the corner plot
 corner(file, 6, samples, lower_bounds, upper_bounds, parameters)
@@ -241,7 +243,7 @@ elapsed = end-start
 print('Fitting time was ', int(elapsed), ' seconds.')
 
 #create the curves plot
-x = np.linspace(0, 15.8, num=1000)
+x = np.linspace(0, results[2][0], num=1000)
 fig, ax = plt.figure(figsize=(15,8)), plt.subplot(111)
 primary, secondary = RV(x, mass_ratio, [results[0][0], results[1][0], results[2][0], results[3][0]])
 ax.plot(x/results[2][0], primary, 'b', lw=2)

@@ -17,7 +17,6 @@ system = ''.join(system)
 JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [datum[2] for datum in data]
 JDp, JDs        = JD, JD
 power_cutoff    = 0.8
-nsteps          = 20000
 RV              = f.RV
 adjustment      = f.adjustment
 phases          = f.phases
@@ -32,7 +31,7 @@ mass_ratio, parameters = 0.7,[32.1675062656, 0.2, 0,
                                          2456260.80134, 2.6320929857, 70]
 #----------------------------------------------------------------------------------------------------#
 
-x = np.linspace(0, 15.8, num=nsteps)
+x = np.linspace(0, parameter[4], num=1000)
 fig, ax = plt.figure(figsize=(15,8)), plt.subplot(111)
 primary, secondary = RV(x, mass_ratio, parameters)
 ax.plot(x/parameters[4], primary, 'b', lw=2)
@@ -44,5 +43,5 @@ plt.xlabel('Orbital Phase', fontsize = 18)
 plt.ylabel('Radial Velocity $\\frac{km}{s}$', fontsize = 18)
 ax.set_xlim([0,1])
 #plt.title('Radial Velocity Curve for 2M06115599+3325505', fontsize = 18)
-plt.savefig(file + ' curve_results.png')
+#plt.savefig(file + ' curve_results.png')
 plt.show()

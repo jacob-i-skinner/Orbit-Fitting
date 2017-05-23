@@ -1,8 +1,8 @@
+# Support functions for the fitting scripts in orbit-fitting.
+
 import numpy as np
 from matplotlib import pyplot as plt
 
-#returns RV values over a time interval, of a curve from given parameters
-#x is an array-like representing samples from a time interval, mass_ratio is a float, parameters is a 6 element list
 pi      = np.pi
 sin     = np.sin
 cos     = np.cos
@@ -10,80 +10,158 @@ tan     = np.tan
 arctan  = np.arctan
 amax    = np.amax
 sqrt    = np.sqrt
-def RV(x, mass_ratio, parameters):
-    #if orbit is assumed circular (4 elements passed) add zeroes for e and omega values
-    #into parameter list
-    if len(parameters) == 4:
-        parameters = list(parameters)
-        parameters.insert(1, 0), parameters.insert(1, 0)
-    check = 1 #this variable is used to prevent the while loop from continuing infinitely,
-              #if the error in the has reached a lower limit above the specified 1e-9, the check provides an escape from the loop
-    K, e, w, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5]
-    M = (2*pi/P)*(x-T) #Mean Anomaly is a function of time
-    E1 = M + e*sin(M) + ((e**2)*sin(2*M)/2) #Eccentric Anomaly is a function of Mean Anomaly
-    while True: #iteratively refines estimate of E1 from initial estimate
-        E0    = E1
-        M0    = E0 - e*sin(E0)
-        E1    = E0 +(M-M0)/(1-e*cos(E0))
-        #this loop is 
-        if amax(E1-E0) < 1e-9 or check-amax(E1-E0) == 0:
-            break
-        else:
-            check = amax(E1-E0)
-    nu = 2*arctan(sqrt((1 + e)/(1 - e))*tan(E1/2)) #True Anomaly is a function of Eccentric anomaly
-    p, s = (K*(cos(nu+w) + (e*cos(w)))+y), ((-K/mass_ratio)*(cos(nu+w) + (e*cos(w)))+y) 
-    return p, s
 
-#This periodogram function was adapted from Jake Vanderplas' article "Fast Lomb-Scargle Periodograms in Python"
+
+def RV(x, q, parameters):
+    '''
+    Computes radial velocity curves from given parameters, akin
+    to defining mathematical function RV(x).
+    This function is based on HELIO_RV from NASA's IDL library.
+    
+    Parameters
+    ----------
+    x : array_like
+        Time-like variable. Because data are plotted with the curves after
+        being phased into a single period, we care about the regime
+        from x = T to x = T + P. x should have sufficient length to provide
+        good resolution to the curve, and a range from 0 to at least P.
+
+    q : float
+        The ratio of the mass of the secondary star to the primary, or mass ratio.
+        Conventionally this is smaller than one. q scales the amplitude
+        of the less massive star.
+        
+    parameters : iterable[6 (or 4)]
+        The set of orbital elements with which to generate the curves. length is
+        6 for an eccentric orbit, 4 for a perfectly circular one.
+    
+    Returns
+    -------
+    primary : array_like[len(x)]
+        The RV curve of the primary component.
+    
+    secondary : array_like[len(x)]
+        The RV curve of the secondary component.
+            
+    '''
+    if len(parameters) == 4: # Circular orbit case.
+        K, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3]
+        return K*cos((2*pi/P)*(x-T)) + y, (-K/q)*cos((2*pi/P)*(x-T)) + y
+    
+    # Otherwise, give the full eccentric treatment.
+    K, e, w, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5]
+    # M (mean anomaly) is a function of x (time).
+    M   = (2*pi/P)*(x-T)
+    # E1 (eccentric anomaly) is a function of M.
+    E1  = M + e*sin(M) + ((e**2)*sin(2*M)/2)
+    
+    step  = 0
+    check = [1, 1]
+    # Iteratively refine estimate of E1 from initial estimate.
+    while True:
+        E0  = E1
+        M0  = E0 - e*sin(E0)
+        E1  = E0 + (M-M0)/(1-e*cos(E0))
+        
+        # If desired or maximal precision is reached, break.
+        # Usually this statement is enough to exit the loop.
+        if amax(E1-E0) < 1e-8:
+            break
+        
+        # If precision has maximized (error not shrinking), break.
+        if check[0]-amax(E1-E0) == 0 or check[1]-amax(E1-E0) == 0:
+            break
+        
+        # Keep track of the last 2 error values.
+        check[step%2] = amax(E1-E0)
+        step += 1
+        
+
+    # v (true anomaly) is a function of E1.
+    v  = 2*arctan(sqrt((1 + e)/(1 - e))*tan(E1/2))
+
+    # Compute and return the final curves
+    return (K*(cos(v+w) + (e*cos(w)))+y), ((-K/q)*(cos(v+w) + (e*cos(w)))+y)
+
+
+
 from scipy.signal import lombscargle
 def periodogram(x, rv, f, max_period):
+    '''
+    Computes a Lomb-Scargle Periodogram of the input RV data.
+    This was adapted from Jake Vanderplas' article "Fast Lomb-Scargle Periodograms in Python."
+    
+    Parameters
+    ----------
+    x : list
+        The times at which the data points were gathered.
+    
+    rv : list
+        The values of the measurand at the corresponding time, x.
+
+    f : float
+        The number of samples to take over the interval.
+        
+    max_period : float
+        The maximum of the interval of periods to check.
+
+    '''
     x = np.array(x)
     rv = np.array(rv)
-    #if using a pseudo-nyquist lower limit in favor of an arbritrary lower limit, uncomment below
     delta_x = np.inf
-    #sorted copy of x, 'x_prime', is used to find minimum time spacing between visits
-    x_prime = np.sort(x)
-    for i in range(0, len(x_prime)-2):
+    # Sort a copy of the time data chronologically.
+    x_prime = np.sort(x) 
+    
+    # Iteratively lower the measure of smallest time spacing, to
+    # determine the minimum spacing between consecutive times.
+    for i in range(0, len(x_prime)-2):        
         if x_prime[i+1]-x_prime[i] < delta_x and x_prime[i+1]-x_prime[i] != 0:
             delta_x = x_prime[i+1]-x_prime[i]
-    periods = np.linspace(delta_x, max_period, num = f) #f here is the number of samples taken over the range of periods
-    # if specifiying one hour limit, use 0.04167 instead of delta_x
 
-    # convert period range into frequency range
+    # Compute the periodogram
+    periods = np.linspace(delta_x, max_period, num = f)
     ang_freqs = 2 * pi / periods
-
-    # compute the (unnormalized) periodogram
-    # note pre-centering of y values!
     powers = lombscargle(x, rv - rv.mean(), ang_freqs)
-
-    # normalize the power
     N = len(x)
     powers *= 2 / (N * rv.std() ** 2)
+
     return periods, powers, delta_x
 
-#slighty altered periodogram function, computes data window for a set of visits
+
 def dataWindow(x, f, max_period):
+    '''
+    Computes a data window of the dataset. That is, a periodogram with
+    the all of the RV values and variances set to 1
+    
+    Parameters
+    ----------
+    x : list
+        The times at which the data points were gathered.
+    
+    f : float
+        The number of samples to take over the interval.
+        
+    max_period : float
+        The maximum of the interval of periods to check.
+
+    '''
     x = np.array(x)
-    #pseudo-nyquist lower limit
     delta_x = np.inf
-    #sorted copy of x, 'x_prime', is used to find minimum time spacing between visits
+    # Sort a copy of the time data chronologically.
     x_prime = np.sort(x)
+
+    # Iteratively lower the measure of smallest time spacing, to
+    # determine the minimum spacing between consecutive times.
     for i in range(0, len(x_prime)-2):
         if x_prime[i+1]-x_prime[i] < delta_x and x_prime[i+1]-x_prime[i] != 0:
             delta_x = x_prime[i+1]-x_prime[i]
+    
     periods = np.linspace(delta_x, max_period, num = f)
-    #one hour limit - 0.04167
-
-    # convert period range into frequency range
     ang_freqs = 2 * pi / periods
-
-    # compute the (unnormalized) periodogram
-    # y values are all 1
     powers = lombscargle(x, np.ones(len(x)), ang_freqs)
-
-    # normalize the power
     N = len(x)
-    powers *= 2 / N #standard deviation is set to 1
+    powers *= 2 / N
+
     return periods, powers
 
 #function removes nan cells from the bad RV visits, and deletes the accompanying JD element 
@@ -208,7 +286,7 @@ def corner(file, ndim, samples, lower_bounds, upper_bounds, parameters):
                           [lower_bounds[2], upper_bounds[2]], [lower_bounds[3], upper_bounds[3]],
                           [lower_bounds[4], upper_bounds[4]], [lower_bounds[5], upper_bounds[5]]], ["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"]
 
-    fig = corner.corner(points, bins = 40, range = bounds, labels = titles, smooth = 0.8,
+    fig = corner.corner(points, bins = 60, range = bounds, labels = titles, smooth = 0.8,
                         truths = truths,
                         quantiles=[0.16, 0.84], show_titles = True, title_kwargs = {"fontsize": 18})
     plt.savefig(file + ' %s dimension parameter results.png'%(ndim))
@@ -232,11 +310,8 @@ def constraints(parameters, lower, upper):
 append  = np.append
 median  = np.median
 inf     = np.inf
-step    = 0
 def probability(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper, nsteps, nwalkers): #lnprob
     JD_median = median(append(JDs, JDp))
-    global step
-    
     if len(guess) == 4 :
         K, T, P, y = guess[0], guess[1], guess[2], guess[3]
         if not (lower[0] < K < upper[0] and JD_median-0.5*guess[2] < T < JD_median+0.5*guess[2] and lower[2] < P < upper[2] and lower[3] < y < upper[3]):
@@ -245,10 +320,7 @@ def probability(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper, nsteps, nwa
         return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
     K, e, w, T, P, y = guess[0], guess[1], guess[2], guess[3], guess[4], guess[5]
     if not (lower[0] < K < upper[0] and -1 < e < 1 and 0 < w < 2*pi and JD_median-0.5*guess[4] < T < JD_median+0.5*guess[4] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
-        step += 1
         return -inf
-    step += 1
-    print(round(400*step/(nwalkers*nsteps), 2), '% complete')
     return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
 
 #This function is used to aid the fitter while it is doing the 1 dimensional T fit

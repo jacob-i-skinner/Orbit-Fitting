@@ -37,16 +37,13 @@ def RV(x, q, parameters):
     
     Returns
     -------
-    primary : array_like[len(x)]
-        The RV curve of the primary component.
-    
-    secondary : array_like[len(x)]
-        The RV curve of the secondary component.
+    [primary, secondary] : [array_like[len(x)], array_like[len(x)]]
+        The primary and secondary RVs for a given time or list of times, x. 
             
     '''
     if len(parameters) == 4: # Circular orbit case.
         K, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3]
-        return K*cos((2*pi/P)*(x-T)) + y, (-K/q)*cos((2*pi/P)*(x-T)) + y
+        return (K*cos((2*pi/P)*(x-T))+y), ((-K/q)*cos((2*pi/P)*(x-T))+y)
     
     # Otherwise, give the full eccentric treatment.
     K, e, w, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5]
@@ -104,26 +101,36 @@ def periodogram(x, rv, f, max_period):
         
     max_period : float
         The maximum of the interval of periods to check.
+    
+    Returns
+    -------
+    periods : array_like[len(f)]
+        Equally spaced array of possible period values.
+
+    powers : array_like[len(f)]
+        The calculated Power values over the range of periods,
+        these form the normalized Lomb-Scargle Periodogram.
+
+    delta_x : float
+        The smallest separation between two values in x.
 
     '''
-    x = np.array(x)
+    # Sort the time data chronologically.
+    x = np.sort(np.array(x))
     rv = np.array(rv)
+    # Start delta_x very large
     delta_x = np.inf
-    # Sort a copy of the time data chronologically.
-    x_prime = np.sort(x) 
     
-    # Iteratively lower the measure of smallest time spacing, to
-    # determine the minimum spacing between consecutive times.
-    for i in range(0, len(x_prime)-2):        
-        if x_prime[i+1]-x_prime[i] < delta_x and x_prime[i+1]-x_prime[i] != 0:
-            delta_x = x_prime[i+1]-x_prime[i]
+    # Iteratively lower delta_x
+    for i in range(0, len(x)-2):        
+        if x[i+1]-x[i] < delta_x and x[i+1]-x[i] != 0:
+            delta_x = x[i+1]-x[i]
 
     # Compute the periodogram
     periods = np.linspace(delta_x, max_period, num = f)
     ang_freqs = 2 * pi / periods
     powers = lombscargle(x, rv - rv.mean(), ang_freqs)
-    N = len(x)
-    powers *= 2 / (N * rv.std() ** 2)
+    powers *= 2 / (len(x) * rv.std() ** 2)
 
     return periods, powers, delta_x
 
@@ -131,7 +138,7 @@ def periodogram(x, rv, f, max_period):
 def dataWindow(x, f, max_period):
     '''
     Computes a data window of the dataset. That is, a periodogram with
-    the all of the RV values and variances set to 1
+    the all of the RV values and variances set to 1.
     
     Parameters
     ----------
@@ -144,44 +151,84 @@ def dataWindow(x, f, max_period):
     max_period : float
         The maximum of the interval of periods to check.
 
-    '''
-    x = np.array(x)
-    delta_x = np.inf
-    # Sort a copy of the time data chronologically.
-    x_prime = np.sort(x)
+    Returns
+    -------
+    periods : array_like[len(f)]
+        Equally spaced array of possible period values.
 
-    # Iteratively lower the measure of smallest time spacing, to
-    # determine the minimum spacing between consecutive times.
-    for i in range(0, len(x_prime)-2):
-        if x_prime[i+1]-x_prime[i] < delta_x and x_prime[i+1]-x_prime[i] != 0:
-            delta_x = x_prime[i+1]-x_prime[i]
+    powers : array_like[len(f)]
+        The calculated Power values over the range of periods,
+        these form the normalized Lomb-Scargle Periodogram.
+
+    '''
+    # Sort the time data chronologically.
+    x = np.sort(np.array(x))
+    delta_x = np.inf
+
+    # Iteratively lower the measure delta_x
+    for i in range(0, len(x)-2):
+        if x[i+1]-x[i] < delta_x and x[i+1]-x[i] != 0:
+            delta_x = x[i+1]-x[i]
     
     periods = np.linspace(delta_x, max_period, num = f)
     ang_freqs = 2 * pi / periods
     powers = lombscargle(x, np.ones(len(x)), ang_freqs)
-    N = len(x)
-    powers *= 2 / N
+    powers *= 2 / len(x)
 
     return periods, powers
 
-#function removes nan cells from the bad RV visits, and deletes the accompanying JD element 
-#returns adjusted RV and JD lists
+
 def adjustment(x, rv):
+    '''
+    Data conditioner to remove bad data values.
+
+    Parameters
+    ----------
+    x : list
+        Times of observation.
+
+    rv : list
+        Observed radial velocities.
+    
+    Returns
+    -------
+    newJD : list
+        Adjusted times. Times with bad RVs have been removed.
+
+    newRV : list
+        List of observations with bad RVs removed.
+    '''
     newJD, newRV = np.array([]), np.array([])
+
+    # If there is a of RV marked, remove the element and the same
+    # element from JD as well.
     for i in range(len(np.where(np.isfinite(rv))[0])):
         newJD = np.append(newJD, x[np.where(np.isfinite(rv))[0][i]])
         newRV = np.append(newRV, rv[np.where(np.isfinite(rv))[0][i]])
+    
     return newJD, newRV
 
-#converts measurements in time into measurements in orbital phase (from 0-1)
-#function is only useful after T and P have been determined
+
 def phases(P, times):
-    phased_Times = np.array([])
-    for i in range(len(times)):
-        phased_Times = np.append(phased_Times, times[i]/P-int(times[i]/P))
-        if phased_Times[i] < 0:
-            phased_Times[i] = phased_Times[i]+1
-    return phased_Times
+    '''
+    Turns a list of times into a list of orbital phases with respect to P
+
+    Parameters
+    ----------
+    P : float
+        Period to which data are phased.
+
+    times : list
+        Times of observation.
+    
+    Returns
+    -------
+    phased_Times : list
+        Times of observation in units of orbital phase.
+    '''
+
+    return [(x%P)/P for x in times]
+
 
 #returns mass ratio, and another of values related to the linear fit
 from scipy import stats
@@ -239,12 +286,14 @@ def residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs):
         +sum((asarray(RVs)-RV(JDs, mass_ratio, parameters)[1])**2)/(len(RVs)))
     return r
 
+''' Not used
 #returns the coefficient of determination for a particular fit
 def rSquared(parameters, mass_ratio, RVp, RVs, JDp, JDs):
     SSres = sum((np.asarray(RVp)-RV(JDp, mass_ratio, parameters)[0])**2)+sum((np.asarray(RVs)-RV(JDs, mass_ratio, parameters)[1])**2)
     SStot = sum((np.asarray(RVp)-np.mean(np.asarray(RVp)))**2)+sum((np.asarray(RVs)-np.mean(np.asarray(RVs)))**2)
     r2    = 1-SSres/SStot
     return r2
+'''
 
 #the functions below are either the MCMC itself, or critical support functions
 #they were adapted from the "fitting a model to data" example by Dan Foreman-Mackey, on the emcee website
@@ -273,20 +322,19 @@ def walkers(file, nsteps, ndim, sampler, results):
 
 def corner(file, ndim, samples, lower_bounds, upper_bounds, parameters):
     import corner
-    points = samples
     truths = parameters
     if ndim == 4:
-        bounds, titles = [[lower_bounds[0], upper_bounds[0]],
+        bounds, labels = [[lower_bounds[0], upper_bounds[0]],
                           [lower_bounds[1], upper_bounds[1]],
                           [lower_bounds[2], upper_bounds[2]],
                           [lower_bounds[3], upper_bounds[3]]], ["$K$", "$T$", "$P$", "$\gamma$"]
 
     elif ndim == 6:
-        bounds, titles = [[lower_bounds[0], upper_bounds[0]], [lower_bounds[1], upper_bounds[1]],
+        bounds, labels = [[lower_bounds[0], upper_bounds[0]], [lower_bounds[1], upper_bounds[1]],
                           [lower_bounds[2], upper_bounds[2]], [lower_bounds[3], upper_bounds[3]],
                           [lower_bounds[4], upper_bounds[4]], [lower_bounds[5], upper_bounds[5]]], ["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"]
 
-    fig = corner.corner(points, bins = 60, range = bounds, labels = titles, smooth = 0.8,
+    fig = corner.corner(samples, bins = 60, range = bounds, labels = labels, smooth = 0.8,
                         truths = truths,
                         quantiles=[0.16, 0.84], show_titles = True, title_kwargs = {"fontsize": 18})
     plt.savefig(file + ' %s dimension parameter results.png'%(ndim))

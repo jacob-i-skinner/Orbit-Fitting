@@ -5,8 +5,8 @@ import functions as f
 
 from matplotlib import pyplot as plt, rcParams
 rcParams.update({'figure.autolayout' : True})
-file     = 'Systems/Deshpande_List/2M21442066+4211363.tbl'
-data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3))
+file     = 'Systems/4205.txt'
+data       = np.genfromtxt(file, skip_header=1, usecols=(0, 1, 3))
 system         = list(file)
 
 # the string manipulations below extract the 2MASS ID from the file name
@@ -23,11 +23,8 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 JDp, JDs        = JD, JD
 samples         = 1000
 max_period      = 5
-nwalkers, nsteps= 5000, 20000 #minimum nwalker: 14, minimum nsteps determined by the convergenve cutoff
+nwalkers, nsteps= 1000, 20000 #minimum nwalker: 14, minimum nsteps determined by the convergenve cutoff
 cutoff          = 5000
-
-if 6 * nwalkers * nsteps * 4 >= 20*10**9:
-    print('Sampler will be very large with current parameters, consider shrinking to save memory')
 
 #define-functions------------------------------------------------------------------------------------------------#
 
@@ -46,8 +43,8 @@ ax.plot(RVs, RVp, 'k.')
 x, y = np.array([np.nanmin(RVs), np.nanmax(RVs)]),-mass_ratio*np.array([np.nanmin(RVs), 
                                                                         np.nanmax(RVs)])+intercept
 ax.plot(x, y)
-ax.set_title('Wilson plot for 2M17204248+4205070')
-ax.text(0, 20, 'q = %s $\pm$ %s\n$\gamma$ = %s $\\frac{km}{s}$' %(np.round(mass_ratio, decimals = 3), np.round(standard_error, decimals = 3),
+#ax.set_title('Wilson plot for 2M17204248+4205070')
+ax.text(-20, -5, 'q = %s $\pm$ %s\n$\gamma$ = %s $\\frac{km}{s}$' %(np.round(mass_ratio, decimals = 3), np.round(standard_error, decimals = 3),
                                                      np.round(gamma, decimals = 3)))
 ax.set_ylabel('Primary Velocity (km/s)')#, size='15')
 ax.set_xlabel('Secondary Velocity (km/s)')#, size='15')
@@ -106,6 +103,7 @@ plt.savefig(file + ' adjusted periodogram.png')
 #-----------------------MCMC------------------------#
 
 import time
+
 start = time.time() #start timer
 
 #constrain parameters
@@ -117,7 +115,11 @@ sampler = MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds
 #print(sampler.acor)
 
 #save the results of the walk
-samples = sampler.chain[:, 10:, :].reshape((-1, 6))
+samples = sampler.chain[:, cutoff:, :].reshape((-1, 6))
+
+#np.savetxt(file + '6 emcee samples.gz', samples, delimiter=',')
+
+#calculate the parameter values and uncertainties from the quantiles
 results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                               zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
 
@@ -137,21 +139,21 @@ results[3], parameters[3] = T_results, T_results[0][0]
 
 del T_sampler, T_samples
 
-'''commented out since it was causing unnecessary issues with the interpretation of the walk. It is still valid
+#commented out since it was causing unnecessary issues with the interpretation of the walk. It is still valid
 #if the eccentricity is negative, perform a transformation of the parameters to make it positive
 #add pi to longitude of periastron, and advance time of periastron by period/2
-if results[1][0] < 0:
-    results[1][0], results[2][0], results[3][0] = -results[1][0], results[2][0] + np.pi, results[3][0] + results[4][0]/2
-    results[1][1], results[1][2] = results[1][2], results[1][1] #swap uncertainties of e
-'''
+#if results[1][0] < 0:
+#    results[1][0], results[2][0], results[3][0] = -results[1][0], results[2][0] + np.pi, results[3][0] + results[4][0]/2
+#    results[1][1], results[1][2] = results[1][2], results[1][1] #swap uncertainties of e
 
 
-'''
 #write results to console
-print('Results:')
-for i in range(6):
-    print(results[i][0], '+',results[i][1], '-',results[i][2])
-'''
+#print('Results:')
+#for i in range(6):
+#    print(results[i][0], '+',results[i][1], '-',results[i][2])
+
+
+
 print('RMS error: ', residuals([results[0][0], results[1][0], results[2][0],
                                 results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs))
 
@@ -189,7 +191,7 @@ plt.title('Radial Velocity Curve', fontsize = 18)
 #plt.title(residuals([results[0][0], results[1][0], results[2][0],
 #                     results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs))
 plt.savefig(file + ' curve_results.png')
-plt.show()
+#plt.show()
 
 #create the corner plot
 corner(file, 6, samples, lower_bounds, upper_bounds, parameters)

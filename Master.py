@@ -28,14 +28,13 @@ cutoff          = 5000
 
 #define-functions------------------------------------------------------------------------------------------------#
 
-periodogram, dataWindow, maxima, phases, massRatio = f.periodogram, f.dataWindow, f.maxima, f.phases, f.massRatio
+periodogram, dataWindow, maxima, phases, massRatio = f.periodogram, f.dataWindow, f.maxima, f.phases, f.wilson
 adjustment, RV, residuals, MCMC, lowEFit, walkers, corner = f.adjustment, f.RV, f.residuals, f.MCMC, f.lowEFit, f.walkers, f.corner
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
 #plot Wilson plot (mass ratio)
-mass_ratio, intercept, r_squared, standard_error, slope_error = massRatio(RVs,RVp, data)
-gamma = intercept/(1+mass_ratio)
+mass_ratio, gamma, standard_error = wilson(data)
 
 fig = plt.figure(figsize=(5,5))
 ax = plt.subplot(111)

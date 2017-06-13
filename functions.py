@@ -1,7 +1,6 @@
 # Support functions for the fitting scripts in orbit-fitting.
 
 import numpy as np
-from matplotlib import pyplot as plt
 
 pi      = np.pi
 sin     = np.sin
@@ -81,8 +80,6 @@ def RV(x, q, parameters):
     return (K*(cos(v+w) + (e*cos(w)))+y), ((-K/q)*(cos(v+w) + (e*cos(w)))+y)
 
 
-
-from scipy.signal import lombscargle
 def periodogram(x, rv, f, max_period):
     '''
     Computes a Lomb-Scargle Periodogram of the input RV data.
@@ -115,6 +112,7 @@ def periodogram(x, rv, f, max_period):
         The smallest separation between two values in x.
 
     '''
+    from scipy.signal import lombscargle
     # Sort the time data chronologically.
     x = np.sort(np.array(x))
     rv = np.array(rv)
@@ -161,6 +159,7 @@ def dataWindow(x, f, max_period):
         these form the normalized Lomb-Scargle Periodogram.
 
     '''
+    from scipy.signal import lombscargle
     # Sort the time data chronologically.
     x = np.sort(np.array(x))
     delta_x = np.inf
@@ -197,6 +196,7 @@ def adjustment(x, rv):
 
     newRV : list
         List of observations with bad RVs removed.
+    
     '''
     newJD, newRV = np.array([]), np.array([])
 
@@ -225,35 +225,49 @@ def phases(P, times):
     -------
     phased_Times : list
         Times of observation in units of orbital phase.
+    
     '''
 
     return [(x%P)/P for x in times]
 
 
-#returns mass ratio, and another of values related to the linear fit
-from scipy import stats
-def massRatio(x, y, system):
-    y = [datum[1] for datum in system if not np.isnan(datum[1]+datum[2])] #primary component
-    x = [datum[2] for datum in system if not np.isnan(datum[1]+datum[2])] #secondary
-    slope, intercept, r_value, p_value, std_err = stats.linregress(x,y)
-    R2 = r_value**2
-    x_bar = np.asarray(x).mean()
-    sx2 = ((x-x_bar)**2).sum()
-    slope_err = std_err * np.sqrt(1./sx2)
-    return -slope, intercept, R2, std_err, slope_err
+def wilson(data):
+    '''
+    Calculate useful things like mass ratio and systemic velocity.
 
-#returns local maxima above a specified cutoff power
-#not currently in use
-def maxima(cutoff, x, y):
-    maxima = np.array([])
-    for i in range(1, len(y)-2):
-        if y[i-1] < y[i] and y[i] > y[i+1] and y[i] > cutoff:
-            maxima = np.append(maxima, x[i])
-    return maxima
+    Parameters
+    ----------
+    data : list
+        Radial velocity pairs in a 2D list.
 
-#provides starting point for the MCMC, returns parameters (within the specified bounds) from a simple but fast fit
-from scipy.optimize import curve_fit
+    Returns
+    -------
+    -slope : float
+        Mass Ratio of the system.
+    
+    intercept/(1-slope) : float
+        Systemic velocity of the system.
+
+    stderr : float
+        Standard error of the estimated gradient.
+
+    '''
+    from scipy.stats import linregress
+    
+    # Primary RVs on y
+    y = [datum[1] for datum in data if not np.isnan(datum[1]+datum[2])]
+
+    # Secondary vales on x
+    x = [datum[2] for datum in data if not np.isnan(datum[1]+datum[2])]
+
+    slope, intercept, rvalue, pvalue, stderr = stats.linregress(x,y)
+    
+    return -slope, intercept/(1-slope), stderr
+
+
+
 def initialGuess(lower, upper, JDp, RVp):
+    from scipy.optimize import curve_fit
     #initialGuess is a simple fitter, so alteredRV exists to return just the primary curve
     def alteredRV(x, K, e, w, T, P, y): #different argument structure accomodates scipy.curve_fit
         check = 1
@@ -274,6 +288,7 @@ def initialGuess(lower, upper, JDp, RVp):
 
 #same as initialGuess, but for the special case of a circular orbit.
 def initialGuessNoE(lower, upper, JDp, RVp):
+    from scipy.optimize import curve_fit
     def alteredNoERV(x, K, T, P, y):
         return K*cos((2*pi*x/P)+T)+y
     return curve_fit(alteredNoERV, JDp, np.asarray(RVp), bounds=(lower, upper))[0]
@@ -282,8 +297,8 @@ def initialGuessNoE(lower, upper, JDp, RVp):
 #is now a properly "normalized" RMS error
 asarray = np.asarray
 def residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs):
-    r = sqrt(sum((asarray(RVp)-RV(JDp, mass_ratio, parameters)[0])**2)/(len(RVp))
-        +sum((asarray(RVs)-RV(JDs, mass_ratio, parameters)[1])**2)/(len(RVs)))
+    r = sqrt( sum((asarray(RVp)-RV(JDp, mass_ratio, parameters)[0])**2)/(len(RVp))
+             +sum((asarray(RVs)-RV(JDs, mass_ratio, parameters)[1])**2)/(len(RVs)))
     return r
 
 ''' Not used
@@ -300,6 +315,7 @@ def rSquared(parameters, mass_ratio, RVp, RVs, JDp, JDs):
 
 #create the walkers plot
 def walkers(file, nsteps, ndim, sampler, results):
+    from matplotlib import pyplot as plt
     linspace = np.linspace
     walk = sampler
     ones = np.ones
@@ -322,17 +338,21 @@ def walkers(file, nsteps, ndim, sampler, results):
 
 def corner(file, ndim, samples, lower_bounds, upper_bounds, parameters):
     import corner
+    from matplotlib import pyplot as plt
     truths = parameters
     if ndim == 4:
-        bounds, labels = [[lower_bounds[0], upper_bounds[0]],
-                          [lower_bounds[1], upper_bounds[1]],
-                          [lower_bounds[2], upper_bounds[2]],
-                          [lower_bounds[3], upper_bounds[3]]], ["$K$", "$T$", "$P$", "$\gamma$"]
+        bounds, labels = [[np.amin(np.transpose(samples)[0]), np.amax(np.transpose(samples)[0])],
+                          [np.amin(np.transpose(samples)[1]), np.amax(np.transpose(samples)[1])],
+                          [np.amin(np.transpose(samples)[2]), np.amax(np.transpose(samples)[2])],
+                          [np.amin(np.transpose(samples)[3]), np.amax(np.transpose(samples)[3])]], ["$K$", "$T$", "$P$", "$\gamma$"]
 
     elif ndim == 6:
-        bounds, labels = [[lower_bounds[0], upper_bounds[0]], [lower_bounds[1], upper_bounds[1]],
-                          [lower_bounds[2], upper_bounds[2]], [lower_bounds[3], upper_bounds[3]],
-                          [lower_bounds[4], upper_bounds[4]], [lower_bounds[5], upper_bounds[5]]], ["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"]
+        bounds, labels = [[np.amin(np.transpose(samples)[0]), np.amax(np.transpose(samples)[0])],
+                          [np.amin(np.transpose(samples)[1]), np.amax(np.transpose(samples)[1])],
+                          [np.amin(np.transpose(samples)[2]), np.amax(np.transpose(samples)[2])],
+                          [np.amin(np.transpose(samples)[3]), np.amax(np.transpose(samples)[3])],
+                          [np.amin(np.transpose(samples)[4]), np.amax(np.transpose(samples)[4])],
+                          [np.amin(np.transpose(samples)[5]), np.amax(np.transpose(samples)[5])]], ["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"]
 
     fig = corner.corner(samples, bins = 60, range = bounds, labels = labels, smooth = 0.8,
                         truths = truths,
@@ -351,6 +371,32 @@ def constraints(parameters, lower, upper):
         return 0
     return -np.inf
 '''
+
+def kernelDensityP(x, samples):
+    '''
+    Use Kernel Density Estimation to find the probability of a value
+    based on an already existing sampling of that distribution.
+
+    Parameters
+    ----------
+    x : float
+        Independent variable.
+
+    samples : iterable
+        Data points drawn from the unknown distribution. Their density
+        implies probability for a given x.
+    
+    Returns
+    -------
+    P(x) : float
+        The inferred probability of the value, x.
+
+    '''
+    # Normalization constant, and width scaler.
+    A = 1/(len(samples)*np.sqrt(6.283185307179586*(np.std(samples)/5)**2))
+    width = (2*(np.std(samples)/5)**2)
+    
+    return A * sum([2.718281828459045**(-((x-points)**2)/width) for points in samples])
 
 #not technically probability, returns the negative infinity if parameters lie outside contraints, otherwise
 #returns negative of RMS error, emcee tries to maximize this quantity
@@ -378,8 +424,9 @@ def goodnessOfFit(T, parameters, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): 
         return -inf
     return -residuals([parameters[0], parameters[1], parameters[2], T, parameters[4], parameters[5]], mass_ratio, RVp, RVs, JDp, JDs)
 
-import emcee
+
 def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalkers, nsteps, cores):
+    import emcee
     random = np.random.randn
     #deprecated by lowEFit, usually
     #if the fit is assumed to be circular, then ndim = 4, proceed accordingly
@@ -419,6 +466,7 @@ def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim
     return sampler
 
 def lowEFit(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nwalkers, nsteps, cores, parameters):
+    import emcee
     initial_results = parameters
     random = np.random.randn
     position = [initial_results[3] + random(1) for i in range(nwalkers)]

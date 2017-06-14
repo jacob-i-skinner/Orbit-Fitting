@@ -1,12 +1,10 @@
 #import-libraries-and-data---------------------------------------------------------------------------------------#
-import os
-import numpy as np
-import functions as f
+import os, numpy as np, functions as f
 
 from matplotlib import pyplot as plt, rcParams
 rcParams.update({'figure.autolayout' : True})
-file     = 'Systems/4205.txt'
-data       = np.genfromtxt(file, skip_header=1, usecols=(0, 1, 3))
+file     = 'Systems/2123+4419/2M21234344+4419277.tbl'
+data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3))
 system         = list(file)
 
 # the string manipulations below extract the 2MASS ID from the file name
@@ -23,18 +21,19 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 JDp, JDs        = JD, JD
 samples         = 1000
 max_period      = 5
-nwalkers, nsteps= 1000, 20000 #minimum nwalker: 14, minimum nsteps determined by the convergenve cutoff
-cutoff          = 5000
+nwalkers, nsteps= 1000, 2000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
+cutoff          = 1000
 
 #define-functions------------------------------------------------------------------------------------------------#
 
-periodogram, dataWindow, maxima, phases, massRatio = f.periodogram, f.dataWindow, f.maxima, f.phases, f.wilson
+periodogram, dataWindow, phases, wilson = f.periodogram, f.dataWindow, f.phases, f.wilson
 adjustment, RV, residuals, MCMC, lowEFit, walkers, corner = f.adjustment, f.RV, f.residuals, f.MCMC, f.lowEFit, f.walkers, f.corner
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
 #plot Wilson plot (mass ratio)
-mass_ratio, gamma, standard_error = wilson(data)
+mass_ratio, intercept, standard_error = wilson(data)
+gamma = intercept/(1+mass_ratio)
 
 fig = plt.figure(figsize=(5,5))
 ax = plt.subplot(111)
@@ -97,7 +96,7 @@ ax.set_ylim(0,1)
 ax.set_xlim(delta_x,max_period)
 ax.set_title(system)
 plt.savefig(file + ' adjusted periodogram.png')
-#plt.show()
+plt.show()
 
 #-----------------------MCMC------------------------#
 

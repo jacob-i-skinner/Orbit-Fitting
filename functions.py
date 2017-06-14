@@ -9,6 +9,7 @@ tan     = np.tan
 arctan  = np.arctan
 amax    = np.amax
 sqrt    = np.sqrt
+asarray = np.asarray
 
 
 def RV(x, q, parameters):
@@ -245,8 +246,8 @@ def wilson(data):
     -slope : float
         Mass Ratio of the system.
     
-    intercept/(1-slope) : float
-        Systemic velocity of the system.
+    intercept : float
+        y-intercept of the line which fits data.
 
     stderr : float
         Standard error of the estimated gradient.
@@ -254,22 +255,47 @@ def wilson(data):
     '''
     from scipy.stats import linregress
     
-    # Primary RVs on y
+    # Primary RVs on y.
     y = [datum[1] for datum in data if not np.isnan(datum[1]+datum[2])]
 
-    # Secondary vales on x
+    # Secondary RVs on x.
     x = [datum[2] for datum in data if not np.isnan(datum[1]+datum[2])]
 
-    slope, intercept, rvalue, pvalue, stderr = stats.linregress(x,y)
+    slope, intercept, rvalue, pvalue, stderr = linregress(x,y)
     
-    return -slope, intercept/(1-slope), stderr
+    return -slope, intercept, stderr
 
 
 
 def initialGuess(lower, upper, JDp, RVp):
+    '''
+    Make a guess at the orbital element values.
+
+    Parameters
+    ----------
+    lower : list(ndim)
+        Lower bounds of the orbital elements.
+    
+    upper : list(ndim)
+        Upper bounds of the orbital elements.
+    
+    JDp : list
+        Times of observation of the primary component.
+    
+    RVp : list
+        Radial velocities of the primary component.
+
+    Returns
+    -------
+    (K, e, w, T, P, y) : list
+        Output from curve_fit.
+        
+    '''
     from scipy.optimize import curve_fit
-    #initialGuess is a simple fitter, so alteredRV exists to return just the primary curve
-    def alteredRV(x, K, e, w, T, P, y): #different argument structure accomodates scipy.curve_fit
+    
+    # Slightly altered version of RV, to accomodate curve_fit.
+    # Structure is the same as that of RV.
+    def alteredRV(x, K, e, w, T, P, y):
         check = 1
         M = (2*pi/P)*(x-T)
         E1 = M + e*sin(M) + ((e**2)*sin(2*M)/2)
@@ -284,18 +310,43 @@ def initialGuess(lower, upper, JDp, RVp):
         nu = 2*arctan(np.sqrt((1 + e)/(1 - e))*tan(E1/2))
         p = ((K)*(cos(nu+w) + (e*cos(w)))+y)
         return p
+
     return curve_fit(alteredRV, JDp, np.asarray(RVp), bounds=(lower, upper))[0]
 
-#same as initialGuess, but for the special case of a circular orbit.
+
 def initialGuessNoE(lower, upper, JDp, RVp):
+    '''
+    Make a guess of the values of the elements, assuming it is circular.
+
+    Parameters
+    ----------
+    lower : list(ndim)
+        Lower bounds of the orbital elements.
+    
+    upper : list(ndim)
+        Upper bounds of the orbital elements.
+    
+    JDp : list
+        Times of observation of the primary component.
+    
+    RVp : list
+        Radial velocities of the primary component.
+
+    Returns
+    -------
+    (K, T, P, y) : list
+        Output from curve_fit.
+
+    '''
     from scipy.optimize import curve_fit
+    
+    # This is a simple trig function.
     def alteredNoERV(x, K, T, P, y):
         return K*cos((2*pi*x/P)+T)+y
+
     return curve_fit(alteredNoERV, JDp, np.asarray(RVp), bounds=(lower, upper))[0]
 
-#returns the residual error of the data w.r.t. a particular fit
-#is now a properly "normalized" RMS error
-asarray = np.asarray
+
 def residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs):
     r = sqrt( sum((asarray(RVp)-RV(JDp, mass_ratio, parameters)[0])**2)/(len(RVp))
              +sum((asarray(RVs)-RV(JDs, mass_ratio, parameters)[1])**2)/(len(RVs)))
@@ -379,8 +430,8 @@ def kernelDensityP(x, samples):
 
     Parameters
     ----------
-    x : float
-        Independent variable.
+    x : list
+        Independent variable space.
 
     samples : iterable
         Data points drawn from the unknown distribution. Their density
@@ -388,15 +439,22 @@ def kernelDensityP(x, samples):
     
     Returns
     -------
-    P(x) : float
-        The inferred probability of the value, x.
+    P : list
+        The NEGATIVE inferred probability values corresponding to x. 
 
     '''
     # Normalization constant, and width scaler.
-    A = 1/(len(samples)*np.sqrt(6.283185307179586*(np.std(samples)/5)**2))
-    width = (2*(np.std(samples)/5)**2)
+
+    if type(x) == int or float: x = [x]
+
+    A       = -1/(len(samples)*np.sqrt(6.283185307179586*(np.std(samples)/5)**2))
+    width   = (2*(np.std(samples)/5)**2)
+    P       = np.empty(len(x))
     
-    return A * sum([2.718281828459045**(-((x-points)**2)/width) for points in samples])
+    for i in range(len(P)):
+        P[i] = A*sum([2.718281828459045**(-((x[i]-points)**2)/width) for points in samples])
+
+    return P
 
 #not technically probability, returns the negative infinity if parameters lie outside contraints, otherwise
 #returns negative of RMS error, emcee tries to maximize this quantity

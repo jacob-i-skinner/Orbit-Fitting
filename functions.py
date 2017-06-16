@@ -394,7 +394,7 @@ def corner(file, ndim, samples, lower_bounds, upper_bounds, parameters):
     if ndim == 4:
         bounds, labels = [[np.amin(np.transpose(samples)[0]), np.amax(np.transpose(samples)[0])],
                           [np.amin(np.transpose(samples)[1]), np.amax(np.transpose(samples)[1])],
-                          [np.amin(np.transpose(samples)[2]), np.amax(np.transpose(samples)[2])],
+                          [3.25, 3.3],
                           [np.amin(np.transpose(samples)[3]), np.amax(np.transpose(samples)[3])]], ["$K$", "$T$", "$P$", "$\gamma$"]
 
     elif ndim == 6:
@@ -402,7 +402,7 @@ def corner(file, ndim, samples, lower_bounds, upper_bounds, parameters):
                           [np.amin(np.transpose(samples)[1]), np.amax(np.transpose(samples)[1])],
                           [np.amin(np.transpose(samples)[2]), np.amax(np.transpose(samples)[2])],
                           [np.amin(np.transpose(samples)[3]), np.amax(np.transpose(samples)[3])],
-                          [np.amin(np.transpose(samples)[4]), np.amax(np.transpose(samples)[4])],
+                          [3.25, 3.3],
                           [np.amin(np.transpose(samples)[5]), np.amax(np.transpose(samples)[5])]], ["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"]
 
     fig = corner.corner(samples, bins = 60, range = bounds, labels = labels, smooth = 0.8,
@@ -423,38 +423,63 @@ def constraints(parameters, lower, upper):
     return -np.inf
 '''
 
-def kernelDensityP(x, samples):
+def kernelDensityP(samples):
     '''
-    Use Kernel Density Estimation to find the probability of a value
-    based on an already existing sampling of that distribution.
+    Sorry this is so ugly.
 
     Parameters
     ----------
-    x : list
-        Independent variable space.
-
-    samples : iterable
-        Data points drawn from the unknown distribution. Their density
-        implies probability for a given x.
     
     Returns
     -------
-    P : list
-        The NEGATIVE inferred probability values corresponding to x. 
 
     '''
-    # Normalization constant, and width scaler.
-
-    if type(x) == int or float: x = [x]
-
-    A       = -1/(len(samples)*np.sqrt(6.283185307179586*(np.std(samples)/5)**2))
-    width   = (2*(np.std(samples)/5)**2)
-    P       = np.empty(len(x))
+    import time
+    start = time.time()
+    from scipy.optimize import minimize
+    from scipy.stats import gaussian_kde as kde
     
-    for i in range(len(P)):
-        P[i] = A*sum([2.718281828459045**(-((x[i]-points)**2)/width) for points in samples])
-
-    return P
+    samples = np.transpose(samples)
+    
+    if samples.shape[0] == 6:
+        def pDensity0(x):
+            return -kde(samples[0]).pdf(x)
+        def pDensity1(x):
+            return -kde(samples[1]).pdf(x)
+        def pDensity2(x):
+            return -kde(samples[2]).pdf(x)
+        def pDensity3(x):
+            return -kde(samples[3]).pdf(x)
+        def pDensity4(x):
+            return -kde(samples[4]).pdf(x)
+        def pDensity5(x):
+            return -kde(samples[5]).pdf(x)
+        pdfs = [pDensity0, pDensity1, pDensity2, pDensity3, pDensity4, pDensity5]
+        results = [0, 0, 0, 0, 0, 0]
+    elif samples.shape[0] == 4:
+        def pDensity0(x):
+            return -kde(samples[0]).pdf(x)
+        def pDensity1(x):
+            return -kde(samples[1]).pdf(x)
+        def pDensity2(x):
+            return -kde(samples[2]).pdf(x)
+        def pDensity3(x):
+            return -kde(samples[3]).pdf(x)
+        pdfs = [pDensity0, pDensity1, pDensity2, pDensity3]
+        results = [0, 0, 0, 0]
+    elif samples.shape[0] == 1:
+        def pDensity0(x):
+            return -kde(samples[0]).pdf(x)
+        pdfs = [pDensity0]
+        results = [0]
+    
+    for i in range(len(pdfs)):
+        results[i] = minimize(pdfs[i], np.percentile(samples[i], 50)).x
+    
+    end = time.time()
+    elapsed = end-start
+    print('optimization time was ', int(elapsed), ' seconds.')
+    return results
 
 #not technically probability, returns the negative infinity if parameters lie outside contraints, otherwise
 #returns negative of RMS error, emcee tries to maximize this quantity

@@ -3,8 +3,8 @@ import os, numpy as np, functions as f
 
 from matplotlib import pyplot as plt, rcParams
 rcParams.update({'figure.autolayout' : True})
-file     = 'Systems/2123+4419/2M21234344+4419277.tbl'
-data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3))
+file     = 'Systems/1720+4205/1720+4205.txt'
+data       = np.genfromtxt(file, skip_header=1, usecols=(0, 1, 3))
 system         = list(file)
 
 # the string manipulations below extract the 2MASS ID from the file name
@@ -21,12 +21,12 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 JDp, JDs        = JD, JD
 samples         = 1000
 max_period      = 5
-nwalkers, nsteps= 1000, 2000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
-cutoff          = 1000
+nwalkers, nsteps= 1000, 20000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
+cutoff          = 5000
 
 #define-functions------------------------------------------------------------------------------------------------#
 
-periodogram, dataWindow, phases, wilson = f.periodogram, f.dataWindow, f.phases, f.wilson
+periodogram, dataWindow, phases, wilson, kernelDensityP = f.periodogram, f.dataWindow, f.phases, f.wilson, f.kernelDensityP
 adjustment, RV, residuals, MCMC, lowEFit, walkers, corner = f.adjustment, f.RV, f.residuals, f.MCMC, f.lowEFit, f.walkers, f.corner
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
@@ -38,8 +38,9 @@ gamma = intercept/(1+mass_ratio)
 fig = plt.figure(figsize=(5,5))
 ax = plt.subplot(111)
 ax.plot(RVs, RVp, 'k.')
-x, y = np.array([np.nanmin(RVs), np.nanmax(RVs)]),-mass_ratio*np.array([np.nanmin(RVs), 
-                                                                        np.nanmax(RVs)])+intercept
+
+x, y = np.array([np.nanmin(RVs), np.nanmax(RVs)]),-mass_ratio*np.array([np.nanmin(RVs),np.nanmax(RVs)])+intercept
+
 ax.plot(x, y)
 #ax.set_title('Wilson plot for 2M17204248+4205070')
 ax.text(-20, -5, 'q = %s $\pm$ %s\n$\gamma$ = %s $\\frac{km}{s}$' %(np.round(mass_ratio, decimals = 3), np.round(standard_error, decimals = 3),
@@ -60,43 +61,19 @@ x, y, delta_x  = periodogram(JDp, RVp, samples, max_period)
 y2    = periodogram(JDs, RVs, samples, max_period)[1]
 y3,y4 = dataWindow(JDp, samples, max_period)[1], dataWindow(JDs, samples, max_period)[1]
 
-#plot periodograms
-#fig, ((ax1,ax4),(ax2,ax5),(ax3,ax6)) = plt.subplots(3, 2, sharex='col', sharey='row')
-#ax1.plot(x, y, 'k')
-#ax1.set_title('Periodograms: Primary')
-#ax1.set_xlim(1/24, max_period)
-#ax4.set_xlim(1/24, max_period)
-#ax2.plot(x, y2, 'k')
-#ax2.set_title('Secondary')
-#ax3.plot(x, y*y2, 'k')
-#ax3.set_title('Product Periodogram')
-#ax4.plot(x, y3, 'k')
-#ax4.set_title('Primary Data Window')
-#ax5.plot(x, y4, 'k')
-#ax5.set_title('Secondary Data Window')
-#ax6.plot(x, y3*y4, 'k')
-#ax6.set_title('Product Data Window')
-#ax3.set_xlabel('Period (days)', size='15')
-#ax6.set_xlabel('Period (days)', size='15')
-#ax2.set_ylabel('Normalized Lomb-Scargle Power', size='20')
-#fig.set_figheight(10)
-#fig.set_figwidth(15)
-#plt.savefig(file + 'periodogram.png')
-
-
 #plot periodogram - data window
 fig = plt.figure(figsize=(8,3))
 ax = plt.subplot(111)
-ax.plot(x, y*y2-y3*y4, 'k', alpha = 1)
 ax.plot(x, y*y2, 'b', alpha = 0.5)
 ax.plot(x, y3*y4, 'r', alpha = 0.5)
+ax.plot(x, y*y2-y3*y4, 'k', alpha = 1)
 ax.set_ylabel('Periodogram Power')#, size='15')
 ax.set_xlabel('Period (days)')#, size='15')
 ax.set_ylim(0,1)
 ax.set_xlim(delta_x,max_period)
 ax.set_title(system)
 plt.savefig(file + ' adjusted periodogram.png')
-plt.show()
+#plt.show()
 
 #-----------------------MCMC------------------------#
 
@@ -121,8 +98,10 @@ samples = sampler.chain[:, cutoff:, :].reshape((-1, 6))
 results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                               zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
 
+
 parameters = [0,0,0,0,0,0]
 for i in range(6):
+    results[i][0] = kernelDensityP(samples)[i]
     parameters[i] = results[i][0]
 
 
@@ -131,9 +110,12 @@ T_sampler = lowEFit(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 
 
 #save the results of the adjustment
 T_samples = T_sampler.chain[:, cutoff:, :].reshape((-1, 1))
+
 T_results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                                 zip(*np.percentile(T_samples, [16, 50, 84], axis=0)))))
-results[3], parameters[3] = T_results, T_results[0][0]
+
+results[3], parameters[3] = T_results, kernelDensityP(T_samples)[0]
+results[3][0] = kernelDensityP(T_samples)[0]
 
 del T_sampler, T_samples
 
@@ -209,11 +191,13 @@ sampler = MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds
 
 #save the results of the walk
 circular_samples = sampler.chain[:, cutoff:, :].reshape((-1, 4))
+
 results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                               zip(*np.percentile(circular_samples, [16, 50, 84], axis=0)))))
 
 parameters = [0,0,0,0,0,0]
 for i in range(4):
+    results[i][0] = kernelDensityP(circular_samples)[i]
     parameters[i] = results[i][0]
 
 '''

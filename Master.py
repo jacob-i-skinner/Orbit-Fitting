@@ -3,13 +3,13 @@ import os, numpy as np, functions as f
 
 from matplotlib import pyplot as plt, rcParams
 rcParams.update({'figure.autolayout' : True})
-file     = 'Systems/1720+4205/1720+4205.txt'
-data       = np.genfromtxt(file, skip_header=1, usecols=(0, 1, 3))
+file     = 'Systems/2123+4419/2123+4419.tbl'
+data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3))
 system         = list(file)
 
 # the string manipulations below extract the 2MASS ID from the file name
-while system[0] != '2' and system[1] != 'M':
-    del system[0]
+# while system[0] != '2' and system[1] != 'M':
+#    del system[0]
 while system[-1] != '.':
     del system[-1]
 del system[-1]
@@ -20,7 +20,7 @@ system = ''.join(system)
 JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [datum[2] for datum in data]
 JDp, JDs        = JD, JD
 samples         = 1000
-max_period      = 5
+max_period      = 6
 nwalkers, nsteps= 1000, 20000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
 cutoff          = 5000
 
@@ -43,7 +43,7 @@ x, y = np.array([np.nanmin(RVs), np.nanmax(RVs)]),-mass_ratio*np.array([np.nanmi
 
 ax.plot(x, y)
 #ax.set_title('Wilson plot for 2M17204248+4205070')
-ax.text(-20, -5, 'q = %s $\pm$ %s\n$\gamma$ = %s $\\frac{km}{s}$' %(np.round(mass_ratio, decimals = 3), np.round(standard_error, decimals = 3),
+ax.text(30, 30, 'q = %s $\pm$ %s\n$\gamma$ = %s $\\frac{km}{s}$' %(np.round(mass_ratio, decimals = 3), np.round(standard_error, decimals = 3),
                                                      np.round(gamma, decimals = 3)))
 ax.set_ylabel('Primary Velocity (km/s)')#, size='15')
 ax.set_xlabel('Secondary Velocity (km/s)')#, size='15')
@@ -82,8 +82,8 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, -1, 0, np.median(np.asarray(JD))-0.5*max_period, delta_x, min(min(RVs), min(RVp))]
-upper_bounds = [200, 1, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, max_period, max(max(RVs), max(RVp))]
+lower_bounds = [0, 0, 0, np.median(np.asarray(JD))-0.5*max_period, delta_x, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, max_period, max(max(RVs), max(RVp))]
 
 #take a walk
 sampler = MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 6, nwalkers, nsteps, 4)
@@ -119,6 +119,7 @@ results[3][0] = kernelDensityP(T_samples)[0]
 
 del T_sampler, T_samples
 
+
 #commented out since it was causing unnecessary issues with the interpretation of the walk. It is still valid
 #if the eccentricity is negative, perform a transformation of the parameters to make it positive
 #add pi to longitude of periastron, and advance time of periastron by period/2
@@ -142,8 +143,7 @@ print('RMS error: ', residuals([results[0][0], results[1][0], results[2][0],
 table = open('log.txt', 'a+')
 labels = ('K', 'e', 'w', 'T', 'P', 'y')
 print('\n' , system, " Results:", file = table)
-print('RMS error: ', residuals([results[0][0], results[1][0], results[2][0],
-                                results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs), file = table)
+print('RMS error: ', residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs), file = table)
 print('q  = ', mass_ratio, ' +/-  ', standard_error , file = table)
 for i in range(6):
     print(labels[i], ' = ', results[i][0], ' +', results[i][1], ' -', results[i][2], file = table)
@@ -200,12 +200,12 @@ for i in range(4):
     results[i][0] = kernelDensityP(circular_samples)[i]
     parameters[i] = results[i][0]
 
-'''
+''''''
 #write results to console
 print('Results:')
 for i in range(4):
     print(results[i][0], '+',results[i][1], '-',results[i][2])
-'''
+''''''
 print('RMS error: ', residuals([results[0][0], results[1][0],
                                 results[2][0], results[3][0]], mass_ratio, RVp, RVs, JDp, JDs))
 

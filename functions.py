@@ -368,15 +368,14 @@ def rSquared(parameters, mass_ratio, RVp, RVs, JDp, JDs):
 def walkers(file, nsteps, ndim, sampler, results):
     from matplotlib import pyplot as plt
     linspace = np.linspace
-    walk = sampler
     ones = np.ones
     label= ['$K$', '$e$', '$\omega$', '$T$', '$P$', '$\gamma$']
     if ndim == 4:
         del label[1:3]
     fig, ax = plt.subplots(ndim, 1, sharex='col')
     for i in range(ndim):
-        for j in range(len(walk.chain[:, 0, i])):
-            ax[i].plot(linspace(0, nsteps, num=nsteps), walk.chain[j, :, i], 'k', alpha=0.2)
+        for j in range(len(sampler.chain[:, 0, i])):
+            ax[i].plot(linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.2)
         ax[i].plot(linspace(0, nsteps, num=nsteps) , np.ones(nsteps)*results[i][0], 'b', lw=2)
         ax[i].set_ylabel(label[i], rotation = 0, fontsize = 18)
         ax[i].yaxis.set_label_coords(-0.06, 0.5)
@@ -392,24 +391,25 @@ def corner(file, ndim, samples, lower_bounds, upper_bounds, parameters):
     from matplotlib import pyplot as plt
     truths = parameters
     if ndim == 4:
-        bounds, labels = [[np.amin(np.transpose(samples)[0]), np.amax(np.transpose(samples)[0])],
-                          [np.amin(np.transpose(samples)[1]), np.amax(np.transpose(samples)[1])],
-                          [3.25, 3.3],
-                          [np.amin(np.transpose(samples)[3]), np.amax(np.transpose(samples)[3])]], ["$K$", "$T$", "$P$", "$\gamma$"]
+        bounds, labels = [[lower_bounds[0], upper_bounds[0]],
+                          [lower_bounds[1], upper_bounds[1]],
+                          [lower_bounds[2], upper_bounds[2]],
+                          [lower_bounds[3], upper_bounds[3]]], ["$K$", "$T$", "$P$", "$\gamma$"]
 
     elif ndim == 6:
-        bounds, labels = [[np.amin(np.transpose(samples)[0]), np.amax(np.transpose(samples)[0])],
-                          [np.amin(np.transpose(samples)[1]), np.amax(np.transpose(samples)[1])],
-                          [np.amin(np.transpose(samples)[2]), np.amax(np.transpose(samples)[2])],
-                          [np.amin(np.transpose(samples)[3]), np.amax(np.transpose(samples)[3])],
-                          [3.25, 3.3],
-                          [np.amin(np.transpose(samples)[5]), np.amax(np.transpose(samples)[5])]], ["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"]
+        bounds, labels = [[lower_bounds[0], upper_bounds[0]],
+                          [lower_bounds[1], upper_bounds[1]],
+                          [lower_bounds[2], upper_bounds[2]],
+                          [lower_bounds[3], upper_bounds[3]],
+                          [lower_bounds[4], upper_bounds[4]],
+                          [lower_bounds[5], upper_bounds[5]]], ["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"]
 
     fig = corner.corner(samples, bins = 60, range = bounds, labels = labels, smooth = 0.8,
                         truths = truths,
                         quantiles=[0.16, 0.84], show_titles = True, title_kwargs = {"fontsize": 18})
     plt.savefig(file + ' %s dimension parameter results.png'%(ndim))
     return
+
 '''
 def constraints(parameters, lower, upper):
     if len(parameters) == 4:
@@ -429,10 +429,13 @@ def kernelDensityP(samples):
 
     Parameters
     ----------
+    samples : list
+        observations drawn from the distribution which is
+        going to be fit.
     
     Returns
     -------
-
+    
     '''
     import time
     start = time.time()
@@ -496,7 +499,7 @@ def probability(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper, nsteps, nwa
             return -inf
         return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
     K, e, w, T, P, y = guess[0], guess[1], guess[2], guess[3], guess[4], guess[5]
-    if not (lower[0] < K < upper[0] and -1 < e < 1 and 0 < w < 2*pi and JD_median-0.5*guess[4] < T < JD_median+0.5*guess[4] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
+    if not (lower[0] < K < upper[0] and 0 < e < 0.9 and 0 < w < 2*pi and JD_median-0.5*guess[4] < T < JD_median+0.5*guess[4] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
         return -inf
     return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
 
@@ -527,7 +530,7 @@ def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim
             position[i][3] = gamma            + 3  *random(1) #y
 
         #create the sampler object and take a walk
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, probability, a=2.0,
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, probability, a=4.0,
                                         args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nsteps, nwalkers), threads=cores)
         sampler.run_mcmc(position, nsteps)
         return sampler
@@ -538,7 +541,7 @@ def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim
     #distribute the walkers around the values given by the initial guesser, in a 'gaussian ball'
     for i in range(nwalkers):
         position[i][0] = initial_guess[0] + 4  *random(1) #K
-        position[i][1] = 0                +0.05*random(1) #e
+        position[i][1] = initial_guess[1] +0.05*random(1) #e
         position[i][2] = initial_guess[2] +     random(1) #w
         position[i][3] = initial_guess[3] +     random(1) #T
         position[i][4] = initial_guess[4] +     random(1) #P

@@ -3,7 +3,7 @@ import os, numpy as np, functions as f
 
 from matplotlib import pyplot as plt, rcParams
 rcParams.update({'figure.autolayout' : True})
-file     = 'Systems/2123+4419/2123+4419.tbl'
+file     = 'Systems/1226+2439/2M12260848+2439315.tbl'
 data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3))
 system         = list(file)
 
@@ -19,9 +19,9 @@ system = ''.join(system)
 
 JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [datum[2] for datum in data]
 JDp, JDs        = JD, JD
-samples         = 1000
-max_period      = 6
-nwalkers, nsteps= 1000, 20000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
+samples         = 10000
+max_period      = 10
+nwalkers, nsteps= 1000, 25000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
 cutoff          = 5000
 
 #define-functions------------------------------------------------------------------------------------------------#
@@ -43,8 +43,8 @@ x, y = np.array([np.nanmin(RVs), np.nanmax(RVs)]),-mass_ratio*np.array([np.nanmi
 
 ax.plot(x, y)
 #ax.set_title('Wilson plot for 2M17204248+4205070')
-ax.text(30, 30, 'q = %s $\pm$ %s\n$\gamma$ = %s $\\frac{km}{s}$' %(np.round(mass_ratio, decimals = 3), np.round(standard_error, decimals = 3),
-                                                     np.round(gamma, decimals = 3)))
+ax.text(30, 30, 'q = %s $\pm$ %s\n$\gamma$ = %s $\\frac{km}{s}$' %(round(mass_ratio, 3), round(standard_error, 3),
+                                                     round(gamma, 3)))
 ax.set_ylabel('Primary Velocity (km/s)')#, size='15')
 ax.set_xlabel('Secondary Velocity (km/s)')#, size='15')
 plt.savefig(file + ' mass ratio.png')
@@ -82,31 +82,34 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, 0, 0, np.median(np.asarray(JD))-0.5*max_period, delta_x, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, max_period, max(max(RVs), max(RVp))]
+lower_bounds = [0, 0, 0, np.median(np.asarray(JD))-0.5*max_period, 5.8, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.9, 2.5*np.pi, np.median(np.asarray(JD))+0.5*max_period, 6.5, max(max(RVs), max(RVp))]
 
 #take a walk
 sampler = MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 6, nwalkers, nsteps, 4)
-#print(sampler.acor)
+print('Walk complete.')
 
 #save the results of the walk
 samples = sampler.chain[:, cutoff:, :].reshape((-1, 6))
-
-#np.savetxt(file + '6 emcee samples.gz', samples, delimiter=',')
+             
 
 #calculate the parameter values and uncertainties from the quantiles
 results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                               zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
 
 
-parameters = [0,0,0,0,0,0]
-for i in range(6):
-    results[i][0] = kernelDensityP(samples)[i]
-    parameters[i] = results[i][0]
+results = np.transpose(results)
+results[0] = kernelDensityP(samples)
+results = np.transpose(results)
+print('Estimation complete.')
 
+#create walkers plot
+walkers(file, nsteps, 6, sampler, results)
+
+del sampler
 
 #Adjust T
-T_sampler = lowEFit(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nwalkers, nsteps, 4, parameters)
+T_sampler = lowEFit(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nwalkers, nsteps, 4, np.transpose(results)[0])
 
 #save the results of the adjustment
 T_samples = T_sampler.chain[:, cutoff:, :].reshape((-1, 1))
@@ -114,8 +117,19 @@ T_samples = T_sampler.chain[:, cutoff:, :].reshape((-1, 1))
 T_results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                                 zip(*np.percentile(T_samples, [16, 50, 84], axis=0)))))
 
-results[3], parameters[3] = T_results, kernelDensityP(T_samples)[0]
-results[3][0] = kernelDensityP(T_samples)[0]
+results[3][0], results[3][1], results[3][2] = kernelDensityP(T_samples)[0], T_results[0][1], T_results[0][2]
+
+samples = np.transpose(samples)
+samples[3] = np.transpose(T_samples)
+samples = np.transpose(samples)
+print('T adjustment complete.')
+
+mask = np.array([])
+for i in range(samples.shape[0]):
+    for j in range(6):
+        if samples[i][j] < lower_bounds[j] or samples[i][j] > upper_bounds[j]:
+            mask = np.append(mask, i)
+samples = np.delete(samples, mask, 0)
 
 del T_sampler, T_samples
 
@@ -135,15 +149,15 @@ del T_sampler, T_samples
 
 
 
-print('RMS error: ', residuals([results[0][0], results[1][0], results[2][0],
-                                results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs))
+print('RMS error: ', round(residuals([results[0][0], results[1][0], results[2][0],
+                                results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs), 3))
 
 
 #write results to log file
 table = open('log.txt', 'a+')
 labels = ('K', 'e', 'w', 'T', 'P', 'y')
 print('\n' , system, " Results:", file = table)
-print('RMS error: ', residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs), file = table)
+print('RMS error: ', residuals(np.transpose(results)[0], mass_ratio, RVp, RVs, JDp, JDs), file = table)
 print('q  = ', mass_ratio, ' +/-  ', standard_error , file = table)
 for i in range(6):
     print(labels[i], ' = ', results[i][0], ' +', results[i][1], ' -', results[i][2], file = table)
@@ -155,7 +169,7 @@ elapsed = end-start
 print('Fitting time was ', int(elapsed), ' seconds.')
 
 #create the curves plot
-x = np.linspace(0, parameters[4], num=1000)
+x = np.linspace(0, np.transpose(results)[0][4], num=1000)
 fig, ax = plt.figure(figsize=(15,8)), plt.subplot(111)
 primary, secondary = RV(x, mass_ratio, [results[0][0], results[1][0], results[2][0],
                                         results[3][0], results[4][0], results[5][0]])
@@ -174,14 +188,11 @@ plt.savefig(file + ' curve_results.png')
 #plt.show()
 
 #create the corner plot
-corner(file, 6, samples, lower_bounds, upper_bounds, parameters)
-
-#create walkers plot
-walkers(file, nsteps, 6, sampler, results)
+corner(file, 6, samples, lower_bounds, upper_bounds, np.transpose(results)[0])
 
 del samples
 
-
+'''
 #-------------circular---MCMC---------------#
 
 start = time.time() #start timer
@@ -195,19 +206,18 @@ circular_samples = sampler.chain[:, cutoff:, :].reshape((-1, 4))
 results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                               zip(*np.percentile(circular_samples, [16, 50, 84], axis=0)))))
 
-parameters = [0,0,0,0,0,0]
-for i in range(4):
-    results[i][0] = kernelDensityP(circular_samples)[i]
-    parameters[i] = results[i][0]
+results = np.transpose(results)
+results[0] = kernelDensityP(circular_samples)
+results = np.transpose(results)
 
-''''''
+
 #write results to console
-print('Results:')
-for i in range(4):
-    print(results[i][0], '+',results[i][1], '-',results[i][2])
-''''''
-print('RMS error: ', residuals([results[0][0], results[1][0],
-                                results[2][0], results[3][0]], mass_ratio, RVp, RVs, JDp, JDs))
+#print('Results:')
+#for i in range(4):
+#    print(results[i][0], '+',results[i][1], '-',results[i][2])
+
+print('RMS error: ', round(residuals([results[0][0], results[1][0],
+                                results[2][0], results[3][0]], mass_ratio, RVp, RVs, JDp, JDs), 3))
 
 
 #write results to log file
@@ -244,8 +254,9 @@ plt.title('Radial Velocity Curve', fontsize = 18)
 plt.savefig(file + ' no e curve_results.png')
 
 #create the corner plot
-corner(file, 4, circular_samples, lower_bounds, upper_bounds, parameters)
+corner(file, 4, circular_samples, lower_bounds, upper_bounds, np.transpose(results)[0])
 
 #create the walkers plot
 walkers(file, nsteps, 4, sampler, results)
 #plt.show()
+'''

@@ -390,23 +390,24 @@ def corner(file, ndim, samples, lower_bounds, upper_bounds, parameters):
     import corner
     from matplotlib import pyplot as plt
     truths = parameters
+    samples_T = np.transpose(samples)
     if ndim == 4:
-        bounds, labels = [[lower_bounds[0], upper_bounds[0]],
-                          [lower_bounds[1], upper_bounds[1]],
-                          [lower_bounds[2], upper_bounds[2]],
-                          [lower_bounds[3], upper_bounds[3]]], ["$K$", "$T$", "$P$", "$\gamma$"]
-
+        bounds, labels = [[np.amin(samples_T[0]), np.amax(samples_T[0])],
+                          [np.amin(samples_T[1]), np.amax(samples_T[1])],
+                          [lower_bounds[2],             upper_bounds[2]],
+                          [np.amin(samples_T[3]), np.amax(samples_T[3])]], ["$K$", "$T$", "$P$", "$\gamma$"]
+ 
     elif ndim == 6:
-        bounds, labels = [[lower_bounds[0], upper_bounds[0]],
-                          [lower_bounds[1], upper_bounds[1]],
-                          [lower_bounds[2], upper_bounds[2]],
-                          [lower_bounds[3], upper_bounds[3]],
-                          [lower_bounds[4], upper_bounds[4]],
-                          [lower_bounds[5], upper_bounds[5]]], ["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"]
+        bounds, labels = [[np.amin(samples_T[0]), np.amax(samples_T[0])],
+                           [np.amin(samples_T[1]), np.amax(samples_T[1])],
+                           [np.amin(samples_T[2]), np.amax(samples_T[2])],
+                           [np.amin(samples_T[3]), np.amax(samples_T[3])],
+                           [lower_bounds[4],             upper_bounds[4]],
+                           [np.amin(samples_T[5]), np.amax(samples_T[5])]], ["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"]
 
     fig = corner.corner(samples, bins = 60, range = bounds, labels = labels, smooth = 0.8,
                         truths = truths,
-                        quantiles=[0.16, 0.84], show_titles = True, title_kwargs = {"fontsize": 18})
+                        quantiles=[0.16, 0.84], show_titles = False, title_kwargs = {"fontsize": 18})
     plt.savefig(file + ' %s dimension parameter results.png'%(ndim))
     return
 
@@ -425,64 +426,41 @@ def constraints(parameters, lower, upper):
 
 def kernelDensityP(samples):
     '''
-    Sorry this is so ugly.
+    Use Kernel Density Estimation to find the most probable
+    values implied by the sample.
 
     Parameters
     ----------
-    samples : list
-        observations drawn from the distribution which is
+    samples : list (shape = (nsamples, ndim))
+        Observations drawn from the distribution which is
         going to be fit.
     
     Returns
     -------
-    
+    maximum : list(ndim)
+        Maxima of the probability distributions along each dimensional axis.
     '''
-    import time
-    start = time.time()
     from scipy.optimize import minimize
     from scipy.stats import gaussian_kde as kde
-    
+
+    # Give the samples array the proper shape.
     samples = np.transpose(samples)
     
-    if samples.shape[0] == 6:
-        def pDensity0(x):
-            return -kde(samples[0]).pdf(x)
-        def pDensity1(x):
-            return -kde(samples[1]).pdf(x)
-        def pDensity2(x):
-            return -kde(samples[2]).pdf(x)
-        def pDensity3(x):
-            return -kde(samples[3]).pdf(x)
-        def pDensity4(x):
-            return -kde(samples[4]).pdf(x)
-        def pDensity5(x):
-            return -kde(samples[5]).pdf(x)
-        pdfs = [pDensity0, pDensity1, pDensity2, pDensity3, pDensity4, pDensity5]
-        results = [0, 0, 0, 0, 0, 0]
-    elif samples.shape[0] == 4:
-        def pDensity0(x):
-            return -kde(samples[0]).pdf(x)
-        def pDensity1(x):
-            return -kde(samples[1]).pdf(x)
-        def pDensity2(x):
-            return -kde(samples[2]).pdf(x)
-        def pDensity3(x):
-            return -kde(samples[3]).pdf(x)
-        pdfs = [pDensity0, pDensity1, pDensity2, pDensity3]
-        results = [0, 0, 0, 0]
-    elif samples.shape[0] == 1:
-        def pDensity0(x):
-            return -kde(samples[0]).pdf(x)
-        pdfs = [pDensity0]
-        results = [0]
+
+    # Define the esitmate of the sample.
+    estimate = kde(samples)
+
+    # Take the minimum of the estimate.
+    def pdf(x):
+        return -estimate(x)
     
-    for i in range(len(pdfs)):
-        results[i] = minimize(pdfs[i], np.percentile(samples[i], 50)).x
-    
-    end = time.time()
-    elapsed = end-start
-    print('optimization time was ', int(elapsed), ' seconds.')
-    return results
+    # Initial guess on maximum is made from 50th percentile of the sample.
+    p0 = [np.percentile(samples[i], 50) for i in range(samples.shape[0])]
+
+    # Calculate the maximum of the distribution.
+    maximum = minimize(pdf, p0).x
+
+    return maximum
 
 #not technically probability, returns the negative infinity if parameters lie outside contraints, otherwise
 #returns negative of RMS error, emcee tries to maximize this quantity
@@ -499,7 +477,7 @@ def probability(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper, nsteps, nwa
             return -inf
         return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
     K, e, w, T, P, y = guess[0], guess[1], guess[2], guess[3], guess[4], guess[5]
-    if not (lower[0] < K < upper[0] and 0 < e < 0.9 and 0 < w < 2*pi and JD_median-0.5*guess[4] < T < JD_median+0.5*guess[4] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
+    if not (lower[0] < K < upper[0] and lower[1] < e < upper[1] and lower[2] < w < upper[2] and JD_median-0.5*guess[4] < T < JD_median+0.5*guess[4] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
         return -inf
     return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
 
@@ -546,7 +524,7 @@ def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim
         position[i][3] = initial_guess[3] +     random(1) #T
         position[i][4] = initial_guess[4] +     random(1) #P
         position[i][5] = gamma            + 3  *random(1) #y
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, probability, a=4.0,
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, probability, a=2.0,
                                     args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nsteps, nwalkers), threads=cores)
     sampler.run_mcmc(position, nsteps)
     return sampler

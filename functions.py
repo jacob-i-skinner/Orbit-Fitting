@@ -41,11 +41,6 @@ def RV(x, q, parameters):
         The primary and secondary RVs for a given time or list of times, x. 
             
     '''
-    if len(parameters) == 4: # Circular orbit case.
-        K, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3]
-        return (K*cos((2*pi/P)*(x-T))+y), ((-K/q)*cos((2*pi/P)*(x-T))+y)
-    
-    # Otherwise, give the full eccentric treatment.
     K, e, w, T, P, y = parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5]
     # M (mean anomaly) is a function of x (time).
     M   = (2*pi/P)*(x-T)
@@ -365,7 +360,7 @@ def rSquared(parameters, mass_ratio, RVp, RVs, JDp, JDs):
 #they were adapted from the "fitting a model to data" example by Dan Foreman-Mackey, on the emcee website
 
 #create the walkers plot
-def walkers(file, nsteps, ndim, sampler, results):
+def walkers(nsteps, ndim, sampler, results):
     from matplotlib import pyplot as plt
     linspace = np.linspace
     ones = np.ones
@@ -383,10 +378,9 @@ def walkers(file, nsteps, ndim, sampler, results):
     ax[0].set_title('Walker Positions During Random Walk', fontsize = 18)
     fig.set_figheight(20)
     fig.set_figwidth(15)
-    plt.savefig(file + ' %s dimension walk results.png'%(ndim))
-    return
+    return fig
 
-def corner(file, ndim, samples, lower_bounds, upper_bounds, parameters):
+def corner(ndim, samples, lower_bounds, upper_bounds, parameters):
     import corner
     from matplotlib import pyplot as plt
     truths = parameters
@@ -408,8 +402,7 @@ def corner(file, ndim, samples, lower_bounds, upper_bounds, parameters):
     fig = corner.corner(samples, bins = 60, range = bounds, labels = labels, smooth = 0.8,
                         truths = truths,
                         quantiles=[0.16, 0.84], show_titles = False, title_kwargs = {"fontsize": 18})
-    plt.savefig(file + ' %s dimension parameter results.png'%(ndim))
-    return
+    return fig
 
 '''
 def constraints(parameters, lower, upper):
@@ -468,16 +461,12 @@ def kernelDensityP(samples):
 append  = np.append
 median  = np.median
 inf     = np.inf
-def probability(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper, nsteps, nwalkers): #lnprob
+def probability(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
     JD_median = median(append(JDs, JDp))
     if len(guess) == 4 :
-        K, T, P, y = guess[0], guess[1], guess[2], guess[3]
-        if not (lower[0] < K < upper[0] and JD_median-0.5*guess[2] < T < JD_median+0.5*guess[2] and lower[2] < P < upper[2] and lower[3] < y < upper[3]):
-        #if not (lower[0] < K < upper[0] and lower[1] < T < upper[1] and lower[2] < P < upper[2] and lower[3] < y < upper[3]):
-            return -inf
-        return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
+        guess.insert(1, 0), guess.insert(2, 0)
     K, e, w, T, P, y = guess[0], guess[1], guess[2], guess[3], guess[4], guess[5]
-    if not (lower[0] < K < upper[0] and lower[1] < e < upper[1] and lower[2] < w < upper[2] and JD_median-0.5*guess[4] < T < JD_median+0.5*guess[4] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
+    if not (lower[0] < K < upper[0] and lower[1] <= e < upper[1] and lower[2] <= w < upper[2] and JD_median-0.5*guess[4] < T < JD_median+0.5*guess[4] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
         return -inf
     return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
 
@@ -509,7 +498,7 @@ def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim
 
         #create the sampler object and take a walk
         sampler = emcee.EnsembleSampler(nwalkers, ndim, probability, a=4.0,
-                                        args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nsteps, nwalkers), threads=cores)
+                                        args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
         sampler.run_mcmc(position, nsteps)
         return sampler
 
@@ -525,7 +514,7 @@ def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim
         position[i][4] = initial_guess[4] +     random(1) #P
         position[i][5] = gamma            + 3  *random(1) #y
     sampler = emcee.EnsembleSampler(nwalkers, ndim, probability, a=2.0,
-                                    args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nsteps, nwalkers), threads=cores)
+                                    args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
     sampler.run_mcmc(position, nsteps)
     return sampler
 

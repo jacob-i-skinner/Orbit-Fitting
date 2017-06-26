@@ -21,7 +21,7 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 JDp, JDs        = JD, JD
 samples         = 10000
 max_period      = 10
-nwalkers, nsteps= 1000, 25000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
+nwalkers, nsteps= 1000, 20000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
 cutoff          = 5000
 
 #define-functions------------------------------------------------------------------------------------------------#
@@ -82,8 +82,8 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, 0, 0, np.median(np.asarray(JD))-0.5*max_period, 5.8, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.9, 2.5*np.pi, np.median(np.asarray(JD))+0.5*max_period, 6.5, max(max(RVs), max(RVp))]
+lower_bounds = [0, 0, -1.6, np.median(np.asarray(JD))-0.5*max_period, 5.8, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 6.5, max(max(RVs), max(RVp))]
 
 #take a walk
 sampler = MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 6, nwalkers, nsteps, 4)
@@ -104,7 +104,7 @@ results = np.transpose(results)
 print('Estimation complete.')
 
 #create walkers plot
-walkers(file, nsteps, 6, sampler, results)
+walkers(nsteps, 6, sampler, results).savefig(file + ' %s dimension walk results.png'%(6))
 
 del sampler
 
@@ -188,7 +188,7 @@ plt.savefig(file + ' curve_results.png')
 #plt.show()
 
 #create the corner plot
-corner(file, 6, samples, lower_bounds, upper_bounds, np.transpose(results)[0])
+corner(6, samples, lower_bounds, upper_bounds, np.transpose(results)[0]).savefig(file + ' %s dimension walk results.png'%(6))
 
 del samples
 

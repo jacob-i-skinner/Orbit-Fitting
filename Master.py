@@ -1,10 +1,10 @@
 #import-libraries-and-data---------------------------------------------------------------------------------------#
 import os, numpy as np, functions as f
-
+from matplotlib.gridspec import GridSpec
 from matplotlib import pyplot as plt, rcParams
-rcParams.update({'figure.autolayout' : True})
-file     = 'Systems/1226+2439/2M12260848+2439315.tbl'
-data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3))
+#rcParams.update({'figure.autolayout' : True})
+file     = 'Systems/1720+4205/1720+4205.txt'
+data       = np.genfromtxt(file, skip_header=1, usecols=(0,1,3))
 system         = list(file)
 
 # the string manipulations below extract the 2MASS ID from the file name
@@ -21,7 +21,7 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 JDp, JDs        = JD, JD
 samples         = 10000
 max_period      = 10
-nwalkers, nsteps= 1000, 20000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
+nwalkers, nsteps= 1000, 25000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
 cutoff          = 5000
 
 #define-functions------------------------------------------------------------------------------------------------#
@@ -82,12 +82,13 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, 0, -1.6, np.median(np.asarray(JD))-0.5*max_period, 5.8, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 6.5, max(max(RVs), max(RVp))]
+lower_bounds = [0, -0.9, -1.6, np.median(np.asarray(JD))-0.5*max_period, 3.27, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 3.3, max(max(RVs), max(RVp))]
 
 #take a walk
+print('\nwalking...')
 sampler = MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 6, nwalkers, nsteps, 4)
-print('Walk complete.')
+print('Walk complete.\n')
 
 #save the results of the walk
 samples = sampler.chain[:, cutoff:, :].reshape((-1, 6))
@@ -97,16 +98,35 @@ samples = sampler.chain[:, cutoff:, :].reshape((-1, 6))
 results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                               zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
 
+#create walkers plot
+print('plotting walk...')
+walkers(nsteps, 6, sampler).savefig(file + ' %s dimension walk results.png'%(6))
+print('Walk Plotted\n')
 
+
+# delete samples which lie outside of the accepted bounds
+print('trimming samples...')
+mask = np.array([])
+for i in range(samples.shape[0]):
+    for j in range(6):
+        if samples[i][j] < lower_bounds[j] or samples[i][j] > upper_bounds[j]:
+            mask = np.append(mask, i)
+samples = np.delete(samples, mask, 0)
+print('Samples trimmed.\n')
+
+# Calculating values.
+print('minimizing...')
 results = np.transpose(results)
 results[0] = kernelDensityP(samples)
 results = np.transpose(results)
-print('Estimation complete.')
+print('Minimization complete.\n')
 
-#create walkers plot
-walkers(nsteps, 6, sampler, results).savefig(file + ' %s dimension walk results.png'%(6))
 
 del sampler
+
+'''
+The T- adjustment step just takes waaaayyy too long. I'm going to try just not using it for a bit. 
+If the eccentricity is low enough for it to matter, just use the circular fitter.
 
 #Adjust T
 T_sampler = lowEFit(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nwalkers, nsteps, 4, np.transpose(results)[0])
@@ -119,19 +139,14 @@ T_results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
 
 results[3][0], results[3][1], results[3][2] = kernelDensityP(T_samples)[0], T_results[0][1], T_results[0][2]
 
+
 samples = np.transpose(samples)
 samples[3] = np.transpose(T_samples)
 samples = np.transpose(samples)
 print('T adjustment complete.')
 
-mask = np.array([])
-for i in range(samples.shape[0]):
-    for j in range(6):
-        if samples[i][j] < lower_bounds[j] or samples[i][j] > upper_bounds[j]:
-            mask = np.append(mask, i)
-samples = np.delete(samples, mask, 0)
-
 del T_sampler, T_samples
+'''
 
 
 #commented out since it was causing unnecessary issues with the interpretation of the walk. It is still valid
@@ -166,65 +181,103 @@ table.close()
 #end timer
 end = time.time()
 elapsed = end-start
-print('Fitting time was ', int(elapsed), ' seconds.')
+print('Fitting time was ', int(elapsed), ' seconds.\n')
 
 #create the curves plot
-x = np.linspace(0, np.transpose(results)[0][4], num=1000)
-fig, ax = plt.figure(figsize=(15,8)), plt.subplot(111)
-primary, secondary = RV(x, mass_ratio, [results[0][0], results[1][0], results[2][0],
-                                        results[3][0], results[4][0], results[5][0]])
-ax.plot(x/results[4][0], primary, 'b', lw=2)
-ax.plot(x/results[4][0], secondary, 'r', lw=2)
-ax.plot(x, np.ones(len(x))*results[5][0], 'k' , label='Systemic Velocity')
-ax.plot(phases(results[4][0], JDp), RVp, 'bs', label='Primary RV Data') #data phased to result period
-ax.plot(phases(results[4][0], JDs), RVs, 'rs', label='Secondary RV data')
-ax.set_xlim([0,1])
+f = plt.figure(figsize=(12,10))
+gs = GridSpec(2,1, height_ratios = [3,1])
+ax1 = f.add_subplot(gs[0,0])
+ax2 = f.add_subplot(gs[1,0])
+plt.subplots_adjust(wspace=0, hspace=0)
+plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
+f.suptitle('Radial Velocity Curve for ' + system, fontsize = 22)
+
+parms = np.transpose(results)[0]
+
+x = np.linspace(0, parms[4], num=1000)
+primary, secondary = RV(x, mass_ratio, parms)
+
+ax1.plot(x/parms[4], primary, 'b', lw=2, label='Primary Curve')
+ax1.plot(x/parms[4], secondary, 'r', lw=2, label='Secondary Curve')
+
+ax1.plot(x, np.ones(len(x))*parms[4], 'k' , label='Systemic Velocity')
+
+ax1.plot(phases(parms[4], JDp), RVp, 'ks', label='Primary RV Data') #data phased to result period
+ax1.plot(phases(parms[4], JDs), RVs, 'ks', label='Secondary RV data')
+
+# Plot the observed - computed underplot
+ax2.plot(phases(parms[4], JDp), RVp-RV(JDp, mass_ratio, parms)[0], 'bs')
+ax2.plot(phases(parms[4], JDs), RVs-RV(JDs, mass_ratio, parms)[1], 'rs')
+ax2.plot((0, 1), np.zeros(2), 'k')
+
+# Adjust the look of the plot
 plt.xlabel('Orbital Phase', fontsize = 18)
-plt.ylabel('Radial Velocity $\\frac{km}{s}$', fontsize = 18)
-plt.title('Radial Velocity Curve', fontsize = 18)
-#plt.title(residuals([results[0][0], results[1][0], results[2][0],
-#                     results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs))
-plt.savefig(file + ' curve_results.png')
-#plt.show()
+ax1.set_ylabel('Radial Velocity $\\frac{km}{s}$', fontsize = 18)
+ax2.set_ylabel('O - C', fontsize = 18)
+ax1.set_xlim([0,1])
+ax2.set_xlim([0,1])
+plt.savefig(file + ' curve results.png')
 
 #create the corner plot
-corner(6, samples, lower_bounds, upper_bounds, np.transpose(results)[0]).savefig(file + ' %s dimension walk results.png'%(6))
+print('cornering...')
+corner(6, samples, lower_bounds, upper_bounds, parms).savefig(file + ' %s dimension parameter results.png'%(6))
+print('Corner plotted.\n')
 
 del samples
 
-'''
+
 #-------------circular---MCMC---------------#
 
 start = time.time() #start timer
 
 #take a walk
+print('walking...')
 sampler = MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 4, nwalkers, nsteps, 4)
+print('Walk complete.\n')
 
 #save the results of the walk
-circular_samples = sampler.chain[:, cutoff:, :].reshape((-1, 4))
+samples = sampler.chain[:, cutoff:, :].reshape((-1, 4))
 
 results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
-                              zip(*np.percentile(circular_samples, [16, 50, 84], axis=0)))))
+                              zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
 
-results = np.transpose(results)
-results[0] = kernelDensityP(circular_samples)
-results = np.transpose(results)
+#create the walkers plot
+print('plotting walk...')
+walkers(nsteps, 4, sampler).savefig(file + ' %s dimension walk results.png'%(4))
+print('Walk plotted.\n')
 
+# delete samples which lie outside of the accepted bounds
+print('trimming samples...')
+mask = np.array([])
+for i in range(samples.shape[0]):
+    for j in range(4):
+        if samples[i][j] < np.delete(lower_bounds,[1,2])[j] or samples[i][j] > np.delete(upper_bounds,[1,2])[j]:
+            mask = np.append(mask, i)
+samples = np.delete(samples, mask, 0)
+print('Samples trimmed.\n')
+
+print('minimizing...')
+results = np.transpose(results)
+results[0] = kernelDensityP(samples)
+results = np.transpose(results)
+print('Minimization complete.\n')
+
+del sampler
 
 #write results to console
 #print('Results:')
 #for i in range(4):
 #    print(results[i][0], '+',results[i][1], '-',results[i][2])
 
-print('RMS error: ', round(residuals([results[0][0], results[1][0],
-                                results[2][0], results[3][0]], mass_ratio, RVp, RVs, JDp, JDs), 3))
+print('RMS error: ', round(residuals([results[0][0], 0, 0, results[1][0],
+                                      results[2][0], results[3][0]], mass_ratio, RVp, RVs, JDp, JDs), 3))
 
 
 #write results to log file
 table = open('log.txt', 'a+')
 labels = ('K', 'T', 'P', 'y')
 print('\n' , system, " Results:", file = table)
-print('RMS error: ', residuals([results[0][0], results[1][0], results[2][0],
+print('RMS error: ', residuals([results[0][0], 0, 0, results[1][0], results[2][0],
                                 results[3][0]], mass_ratio, RVp, RVs, JDp, JDs), file = table)
 print('q  = ', mass_ratio, ' +/-  ', standard_error , file = table)
 for i in range(4):
@@ -234,29 +287,45 @@ table.close()
 #end timer
 end = time.time()
 elapsed = end-start
-print('Fitting time was ', int(elapsed), ' seconds.')
+print('Fitting time was ', int(elapsed), ' seconds.\n')
 
 #create the curves plot
-x = np.linspace(0, results[2][0], num=1000)
-fig, ax = plt.figure(figsize=(15,8)), plt.subplot(111)
-primary, secondary = RV(x, mass_ratio, [results[0][0], results[1][0], results[2][0], results[3][0]])
-ax.plot(x/results[2][0], primary, 'b', lw=2)
-ax.plot(x/results[2][0], secondary, 'r', lw=2)
-ax.plot(x, np.ones(len(x))*results[3][0], 'k' , label='Systemic Velocity')
-ax.plot(phases(results[2][0], JDp), RVp, 'bs', label='Primary RV Data') #data phased to result period
-ax.plot(phases(results[2][0], JDs), RVs, 'rs', label='Secondary RV data')
-ax.set_xlim([0,1])
+f = plt.figure(figsize=(12,10))
+gs = GridSpec(2,1, height_ratios = [3,1])
+ax1 = f.add_subplot(gs[0,0])
+ax2 = f.add_subplot(gs[1,0])
+plt.subplots_adjust(wspace=0, hspace=0)
+plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
+f.suptitle('Radial Velocity Curve for ' + system, fontsize = 22)
+
+parms = np.transpose(results)[0]
+
+x = np.linspace(0, parms[2], num=1000)
+primary, secondary = RV(x, mass_ratio, np.insert(np.transpose(results)[0], 1, [0,0]))
+
+ax1.plot(x/parms[2], primary, 'b', lw=2, label='Primary Curve')
+ax1.plot(x/parms[2], secondary, 'r', lw=2, label='Secondary Curve')
+
+ax1.plot(x, np.ones(len(x))*parms[2], 'k' , label='Systemic Velocity')
+
+ax1.plot(phases(parms[2], JDp), RVp, 'ks', label='Primary RV Data') #data phased to result period
+ax1.plot(phases(parms[2], JDs), RVs, 'ks', label='Secondary RV data')
+
+# Plot the observed - computed underplot
+ax2.plot(phases(parms[2], JDp), RVp-RV(JDp, mass_ratio, np.insert(parms,1,[0,0]))[0], 'bs')
+ax2.plot(phases(parms[2], JDs), RVs-RV(JDs, mass_ratio, np.insert(parms,1,[0,0]))[1], 'rs')
+ax2.plot((0, 1), np.zeros(2), 'k')
+
+# Adjust the look of the plot
 plt.xlabel('Orbital Phase', fontsize = 18)
-plt.ylabel('Radial Velocity $\\frac{km}{s}$', fontsize = 18)
-plt.title('Radial Velocity Curve', fontsize = 18)
-#plt.title(residuals([results[0][0], results[1][0],
-#                     results[2][0], results[3][0]], mass_ratio, RVp, RVs, JDp, JDs))
-plt.savefig(file + ' no e curve_results.png')
+ax1.set_ylabel('Radial Velocity $\\frac{km}{s}$', fontsize = 18)
+ax2.set_ylabel('O - C', fontsize = 18)
+ax1.set_xlim([0,1])
+ax2.set_xlim([0,1])
+plt.savefig(file + ' no e curve results.png')
+
 
 #create the corner plot
-corner(file, 4, circular_samples, lower_bounds, upper_bounds, np.transpose(results)[0])
-
-#create the walkers plot
-walkers(file, nsteps, 4, sampler, results)
-#plt.show()
-'''
+print('cornerning...')
+corner(4, samples, lower_bounds, upper_bounds, parms).savefig(file + ' %s dimension parameter results.png'%(4))
+print('Corner plotted.\n')

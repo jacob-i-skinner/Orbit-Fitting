@@ -111,9 +111,11 @@ def periodogram(x, rv, f, max_period):
 
     '''
     from scipy.signal import lombscargle
+    
     # Sort the time data chronologically.
     x = np.sort(np.array(x))
     rv = np.array(rv)
+    
     # Start delta_x very large
     delta_x = np.inf
     
@@ -158,6 +160,7 @@ def dataWindow(x, f, max_period):
 
     '''
     from scipy.signal import lombscargle
+    
     # Sort the time data chronologically.
     x = np.sort(np.array(x))
     delta_x = np.inf
@@ -393,57 +396,174 @@ def residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs):
     return r
 
 
-def walkers(nsteps, ndim, sampler):
-    # Create the walkers plot.
+def walkers(nsteps, ndim, cutoff, sampler):
+    '''
+    Create a plot showing the path of each walker in each
+    dimension over the course of the random walk.
+
+    Parameters
+    ----------
+    nsteps : int
+        The number of steps that were taken during the random walk.
+    
+    ndim : int
+        The number of dimensions explored during the random walk.
+    
+    cutoff : int
+        Steps before the cutoff are ignored when creating the samples
+        array, and so are ignored when calculating values, and when creating
+        the corner plot.
+
+    sampler : emcee object
+        The object created by emcee during the random walk,
+        it contains the information about which walker was where
+        at each step.
+
+
+    Returns
+    -------
+    fig : fig object
+        Something to either plot or save
+
+    '''
     from matplotlib import pyplot as plt
+    
+    # A bit of time is saved by making this local 
+    # and not referencing numpy everytime the loop iterates.
     linspace = np.linspace
-    ones = np.ones
+
+    # Make the labels.
     label= ['$K$', '$e$', '$\omega$', '$T$', '$P$', '$\gamma$']
     if ndim == 4:
         del label[1:3]
+    
+    # Create the fig object.
     fig, ax = plt.subplots(ndim, 1, sharex='col')
+    plt.xlabel('Step Number (Cutoff step: %s'%(cutoff), fontsize = 18)
+    ax[0].set_title('Walker Positions During Random Walk', fontsize = 18)
+    fig.set_figheight(20)
+    fig.set_figwidth(15)
+
+    # Populate the i-th axis with lines showing each walker's location 
+    # along that axis, as a function of the step number.
     for i in range(ndim):
         for j in range(len(sampler.chain[:, 0, i])):
             ax[i].plot(linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.2)
         ax[i].set_ylabel(label[i], rotation = 0, fontsize = 18)
         ax[i].yaxis.set_label_coords(-0.06, 0.5)
-    plt.xlabel('Step Number', fontsize = 18)
-    ax[0].set_title('Walker Positions During Random Walk', fontsize = 18)
-    fig.set_figheight(20)
-    fig.set_figwidth(15)
+    
     return fig
 
 
-def corner(ndim, samples, lower_bounds, upper_bounds, parameters):
-    # Create the corner plot
+def trim(samples, lower, upper):
+    '''
+    Cut out rows for which one of the coordinate values
+    lies out-of-bounds.
+
+    Parameters
+    ----------
+    samples : array
+        The collection of samples drawn from the walk.
+    
+    lower : list
+        Lower bounds.
+    
+    upper : list
+        upper bounds.
+    
+    Returns
+    -------
+    samples : array
+        A modified version of samples, with some rows removed
+    '''
+    delete = np.delete
+    # Loop through each column.
+    for j in range(samples.shape[1]):
+        
+        # Step prevents is our loop exit variable,
+        # and the row index.
+        step = 0
+        samples.shape[0]
+        # Loop through all rows.
+        while True:
+
+            # If we will raise an index error, exit the loop.
+            if step == samples.shape[0]:
+                break
+
+            # If a row contains an out of bounds element, delete it and do not step forward.
+            if not (lower[j] < samples[step][j] and samples[step][j] < upper[j]):
+                samples = delete(samples, step, axis=0)
+
+            # Otherwise, do step forward
+            else:
+                step += 1
+
+    return samples
+
+def corner(ndim, samples, parameters):
+    '''
+    Create a plot showing the all of the samples (after the cutoff) drawn
+    from the distribution. There are (ndim choose 2) + ndim subplots.
+    ndim subplots show histograms of the samples along a single axis.
+    The other (ndim choose 2) subplots are projections of the sample into
+    various axial planes. This is useful for seeing covariances among parameters.
+
+    Parameters
+    ----------
+    ndim : int
+        The number of dimensions explored during the random walk.
+
+    samples : array(nsteps*nwalkers, ndim)
+        A collection of coordinates resulting from the random walk.
+        
+    parameters : list
+        Values to be displayed as the 'truth' values. They represent the
+        coordinate of the position which maximizes the estimated PDF.
+    
+    Returns
+    -------
+    fig : fig object
+        Something to either plot or save
+
+    '''
     import corner
     from matplotlib import pyplot as plt
-    truths = parameters
+
+    # unnecessary? MUST EXPLAIN
+    #truths = parameters
+
+    # Rearrange samples to make dynamic bounds setting more readable.
     samples_T = np.transpose(samples)
+
+    # Set up bounds and labels for 4 or 6 dimensional cases.
     if ndim == 4:
-        bounds, labels = [[np.amin(samples_T[0]), np.amax(samples_T[0])],
-                          [np.amin(samples_T[1]), np.amax(samples_T[1])],
-                          [np.amin(samples_T[2]), np.amax(samples_T[2])],
-                          [np.amin(samples_T[3]), np.amax(samples_T[3])]], ["$K$", "$T$", "$P$", "$\gamma$"]
+        bounds = [[np.amin(samples_T[0]), np.amax(samples_T[0])],
+                  [np.amin(samples_T[1]), np.amax(samples_T[1])],
+                  [np.amin(samples_T[2]), np.amax(samples_T[2])],
+                  [np.amin(samples_T[3]), np.amax(samples_T[3])]]
+        labels = ["$K$", "$T$", "$P$", "$\gamma$"]
  
     elif ndim == 6:
-        bounds, labels = [[np.amin(samples_T[0]), np.amax(samples_T[0])],
-                           [np.amin(samples_T[1]), np.amax(samples_T[1])],
-                           [np.amin(samples_T[2]), np.amax(samples_T[2])],
-                           [np.amin(samples_T[3]), np.amax(samples_T[3])],
-                           [np.amin(samples_T[4]), np.amax(samples_T[4])],
-                           [np.amin(samples_T[5]), np.amax(samples_T[5])]], ["$K$'", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"]
+        bounds = [[np.amin(samples_T[0]), np.amax(samples_T[0])],
+                  [np.amin(samples_T[1]), np.amax(samples_T[1])],
+                  [np.amin(samples_T[2]), np.amax(samples_T[2])],
+                  [np.amin(samples_T[3]), np.amax(samples_T[3])],
+                  [np.amin(samples_T[4]), np.amax(samples_T[4])],
+                  [np.amin(samples_T[5]), np.amax(samples_T[5])]]
+        labels = ["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"]
 
-    fig = corner.corner(samples, bins = 60, range = bounds, labels = labels, smooth = 1.2,
-                        truths = truths,
-                        quantiles=[0.16, 0.84], show_titles = True, title_kwargs = {"fontsize": 18})
+    # Create the figure.
+    fig = corner.corner(samples, bins = 60, range = bounds, labels = labels,
+                        smooth = 1.2,truths = parameters, quantiles=[0.16, 0.84],
+                        show_titles = False, title_kwargs = {"fontsize": 18})
     return fig
 
 
-def kernelDensityP(samples):
+def maximize(samples):
     '''
-    Use Kernel Density Estimation to find the most probable
-    values implied by the sample.
+    Use Kernel Density Estimation to find a continuous PDF
+    from the discrete sampling. Maximize that distribution.
 
     Parameters
     ----------
@@ -462,30 +582,34 @@ def kernelDensityP(samples):
     # Give the samples array the proper shape.
     samples = np.transpose(samples)
     
-
-    # Define the esitmate of the sample.
+    # Estimate the continous PDF.
     estimate = kde(samples)
 
     # Take the minimum of the estimate.
-    def pdf(x):
+    def PDF(x):
         return -estimate(x)
     
     # Initial guess on maximum is made from 50th percentile of the sample.
     p0 = [np.percentile(samples[i], 50) for i in range(samples.shape[0])]
 
     # Calculate the maximum of the distribution.
-    maximum = minimize(pdf, p0).x
+    maximum = minimize(PDF, p0).x
 
     return maximum
 
-#the functions below were adapted from the "fitting a model to data" example
-# by Dan Foreman-Mackey, on the emcee website
-# returns the negative infinity if parameters lie outside contraints, otherwise
-#returns negative of RMS error, emcee tries to maximize this quantity
+
+'''
+The functions below were adapted from the "fitting a model to data" example
+by Dan Foreman-Mackey, on the emcee website: http://dan.iel.fm/emcee/current/
+'''
+
 append  = np.append
 median  = np.median
 inf     = np.inf
 insert  = np.insert
+
+# returns the negative infinity if parameters lie outside contraints, otherwise
+#returns negative of RMS error, emcee tries to maximize this quantity
 def likelihood(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
     JD_median = median(append(JDs, JDp))
 
@@ -493,11 +617,8 @@ def likelihood(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
         guess = insert(guess, 1, [0,0])
     K, e, w, T, P, y = guess[0], guess[1], guess[2], guess[3], guess[4], guess[5]
 
-    if not (lower[0] < K < upper[0] and lower[1] <= e < upper[1] and lower[2] <= w < upper[2] and
+    if not(lower[0] < K < upper[0] and lower[1] <= e < upper[1] and lower[2] <= w < upper[2] and
             JD_median-0.5*guess[4] < T < JD_median+0.5*guess[4] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
-        #print(lower)
-        #print(guess)
-        #print(upper)
         return -inf
 
     return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
@@ -549,6 +670,8 @@ def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim
     sampler.run_mcmc(position, nsteps)
     return sampler
 
+
+# currently not in use
 def lowEFit(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nwalkers, nsteps, cores, parameters):
     import emcee
     initial_results = parameters

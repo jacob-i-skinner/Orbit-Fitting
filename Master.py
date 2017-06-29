@@ -21,13 +21,13 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 JDp, JDs        = JD, JD
 samples         = 10000
 max_period      = 10
-nwalkers, nsteps= 1000, 25000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
-cutoff          = 5000
+nwalkers, nsteps= 1000, 2500 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
+cutoff          = 500
 
 #define-functions------------------------------------------------------------------------------------------------#
 
-periodogram, dataWindow, phases, wilson, kernelDensityP = f.periodogram, f.dataWindow, f.phases, f.wilson, f.kernelDensityP
-adjustment, RV, residuals, MCMC, lowEFit, walkers, corner = f.adjustment, f.RV, f.residuals, f.MCMC, f.lowEFit, f.walkers, f.corner
+periodogram, dataWindow, phases, wilson, maximize = f.periodogram, f.dataWindow, f.phases, f.wilson, f.maximize
+adjustment, RV, residuals, MCMC, walkers, corner, trim  = f.adjustment, f.RV, f.residuals, f.MCMC, f.walkers, f.corner, f.trim
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
@@ -75,6 +75,8 @@ ax.set_title(system)
 plt.savefig(file + ' adjusted periodogram.png')
 #plt.show()
 
+plt.close('all')
+
 #-----------------------MCMC------------------------#
 
 import time
@@ -100,29 +102,33 @@ results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
 
 #create walkers plot
 print('plotting walk...')
-walkers(nsteps, 6, sampler).savefig(file + ' %s dimension walk results.png'%(6))
+walkers(nsteps, 6, cutoff, sampler).savefig(file + ' %s dimension walk results.png'%(6))
+plt.close()
 print('Walk Plotted\n')
 
+del sampler
 
 # delete samples which lie outside of the accepted bounds
 print('trimming samples...')
-mask = np.array([])
-for i in range(samples.shape[0]):
-    for j in range(6):
-        if samples[i][j] < lower_bounds[j] or samples[i][j] > upper_bounds[j]:
-            mask = np.append(mask, i)
-samples = np.delete(samples, mask, 0)
+samples = trim(samples, lower_bounds, upper_bounds)
 print('Samples trimmed.\n')
 
 # Calculating values.
-print('minimizing...')
+print('maximizing...')
 results = np.transpose(results)
-results[0] = kernelDensityP(samples)
+results[0] = maximize(samples)
 results = np.transpose(results)
-print('Minimization complete.\n')
+print('Maximization complete.\n')
 
+parms = np.transpose(results)[0]
 
-del sampler
+#create the corner plot
+print('cornering...')
+corner(6, samples, parms).savefig(file + ' %s dimension parameter results.png'%(6))
+plt.close()
+print('Corner plotted.\n')
+
+del samples
 
 '''
 The T- adjustment step just takes waaaayyy too long. I'm going to try just not using it for a bit. 
@@ -137,7 +143,7 @@ T_samples = T_sampler.chain[:, cutoff:, :].reshape((-1, 1))
 T_results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                                 zip(*np.percentile(T_samples, [16, 50, 84], axis=0)))))
 
-results[3][0], results[3][1], results[3][2] = kernelDensityP(T_samples)[0], T_results[0][1], T_results[0][2]
+results[3][0], results[3][1], results[3][2] = maximize(T_samples)[0], T_results[0][1], T_results[0][2]
 
 
 samples = np.transpose(samples)
@@ -192,8 +198,6 @@ plt.subplots_adjust(wspace=0, hspace=0)
 plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
 f.suptitle('Radial Velocity Curve for ' + system, fontsize = 22)
 
-parms = np.transpose(results)[0]
-
 x = np.linspace(0, parms[4], num=1000)
 primary, secondary = RV(x, mass_ratio, parms)
 
@@ -218,15 +222,11 @@ ax1.set_xlim([0,1])
 ax2.set_xlim([0,1])
 plt.savefig(file + ' curve results.png')
 
-#create the corner plot
-print('cornering...')
-corner(6, samples, lower_bounds, upper_bounds, parms).savefig(file + ' %s dimension parameter results.png'%(6))
-print('Corner plotted.\n')
-
-del samples
 
 
 #-------------circular---MCMC---------------#
+
+
 
 start = time.time() #start timer
 
@@ -243,26 +243,32 @@ results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
 
 #create the walkers plot
 print('plotting walk...')
-walkers(nsteps, 4, sampler).savefig(file + ' %s dimension walk results.png'%(4))
+walkers(nsteps, 4, cutoff, sampler).savefig(file + ' %s dimension walk results.png'%(4))
+plt.close()
 print('Walk plotted.\n')
+
+del sampler
 
 # delete samples which lie outside of the accepted bounds
 print('trimming samples...')
-mask = np.array([])
-for i in range(samples.shape[0]):
-    for j in range(4):
-        if samples[i][j] < np.delete(lower_bounds,[1,2])[j] or samples[i][j] > np.delete(upper_bounds,[1,2])[j]:
-            mask = np.append(mask, i)
-samples = np.delete(samples, mask, 0)
+samples = trim(samples, np.delete(lower_bounds, [1,2]), np.delete(upper_bounds, [1,2]))
 print('Samples trimmed.\n')
 
-print('minimizing...')
+print('maximizing...')
 results = np.transpose(results)
-results[0] = kernelDensityP(samples)
+results[0] = maximize(samples)
 results = np.transpose(results)
-print('Minimization complete.\n')
+print('Maximization complete.\n')
 
-del sampler
+parms = np.transpose(results)[0]
+
+#create the corner plot
+print('cornerning...')
+corner(4, samples, parms).savefig(file + ' %s dimension parameter results.png'%(4))
+plt.close()
+print('Corner plotted.\n')
+
+del samples
 
 #write results to console
 #print('Results:')
@@ -298,8 +304,6 @@ plt.subplots_adjust(wspace=0, hspace=0)
 plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
 f.suptitle('Radial Velocity Curve for ' + system, fontsize = 22)
 
-parms = np.transpose(results)[0]
-
 x = np.linspace(0, parms[2], num=1000)
 primary, secondary = RV(x, mass_ratio, np.insert(np.transpose(results)[0], 1, [0,0]))
 
@@ -323,9 +327,3 @@ ax2.set_ylabel('O - C', fontsize = 18)
 ax1.set_xlim([0,1])
 ax2.set_xlim([0,1])
 plt.savefig(file + ' no e curve results.png')
-
-
-#create the corner plot
-print('cornerning...')
-corner(4, samples, lower_bounds, upper_bounds, parms).savefig(file + ' %s dimension parameter results.png'%(4))
-print('Corner plotted.\n')

@@ -363,7 +363,7 @@ def residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs):
         Ratio of secondary mass to primary mass.
     
     RVp : list
-        Primary observed velocities
+        Primary observed velocities.
 
     RVp : list
         Secondary observed velocities.
@@ -423,7 +423,7 @@ def walkers(nsteps, ndim, cutoff, sampler):
     Returns
     -------
     fig : fig object
-        Something to either plot or save
+        Something to either plot or save.
 
     '''
     from matplotlib import pyplot as plt
@@ -439,7 +439,7 @@ def walkers(nsteps, ndim, cutoff, sampler):
     
     # Create the fig object.
     fig, ax = plt.subplots(ndim, 1, sharex='col')
-    plt.xlabel('Step Number (Cutoff step: %s'%(cutoff), fontsize = 18)
+    plt.xlabel('Step Number (Cutoff step: %s)'%(cutoff), fontsize = 18)
     ax[0].set_title('Walker Positions During Random Walk', fontsize = 18)
     fig.set_figheight(20)
     fig.set_figwidth(15)
@@ -448,58 +448,12 @@ def walkers(nsteps, ndim, cutoff, sampler):
     # along that axis, as a function of the step number.
     for i in range(ndim):
         for j in range(len(sampler.chain[:, 0, i])):
-            ax[i].plot(linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.2)
+            ax[i].plot(linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.15)
         ax[i].set_ylabel(label[i], rotation = 0, fontsize = 18)
         ax[i].yaxis.set_label_coords(-0.06, 0.5)
     
     return fig
 
-
-def trim(samples, lower, upper):
-    '''
-    Cut out rows for which one of the coordinate values
-    lies out-of-bounds.
-
-    Parameters
-    ----------
-    samples : array
-        The collection of samples drawn from the walk.
-    
-    lower : list
-        Lower bounds.
-    
-    upper : list
-        upper bounds.
-    
-    Returns
-    -------
-    samples : array
-        A modified version of samples, with some rows removed
-    '''
-    delete = np.delete
-    # Loop through each column.
-    for j in range(samples.shape[1]):
-        
-        # Step prevents is our loop exit variable,
-        # and the row index.
-        step = 0
-        samples.shape[0]
-        # Loop through all rows.
-        while True:
-
-            # If we will raise an index error, exit the loop.
-            if step == samples.shape[0]:
-                break
-
-            # If a row contains an out of bounds element, delete it and do not step forward.
-            if not (lower[j] < samples[step][j] and samples[step][j] < upper[j]):
-                samples = delete(samples, step, axis=0)
-
-            # Otherwise, do step forward
-            else:
-                step += 1
-
-    return samples
 
 def corner(ndim, samples, parameters):
     '''
@@ -524,7 +478,7 @@ def corner(ndim, samples, parameters):
     Returns
     -------
     fig : fig object
-        Something to either plot or save
+        Something to either plot or save.
 
     '''
     import corner
@@ -608,22 +562,93 @@ median  = np.median
 inf     = np.inf
 insert  = np.insert
 
-# returns the negative infinity if parameters lie outside contraints, otherwise
-#returns negative of RMS error, emcee tries to maximize this quantity
-def likelihood(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
+def likelihood(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper):
+    '''
+    Calculate the likelihood of a set of orbital elements being
+    the 'true' values. Values are negative approaching 0! emcee
+    does its best to maximize this value.
+
+    Parameters
+    ----------
+    guess : list
+        The set of parameters to be checked. 6 for eccentric, 4 for circular.
+
+    mass_ratio : float
+        Ratio of secondary mass to primary mass.
+    
+    RVp : list
+        Primary observed velocities.
+
+    RVp : list
+        Secondary observed velocities.
+
+    JDp : list
+        Primary observation times.
+    
+    JDs : list
+        Secondary observation times.
+    
+    lower : list
+        Lower bound of allowed values.
+    
+    upper : list
+        upper bound of allowed values.
+
+    Returns
+    -------
+    -inf : nan
+        Returned if any element of guess falls outside of bounds.
+
+    -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs) : float
+        The negative of the residual error between observed and computed.
+
+    '''
     JD_median = median(append(JDs, JDp))
 
+    # If fit is assumed circular, fill in the missing e and w.
     if len(guess) == 4 :
         guess = insert(guess, 1, [0,0])
+    
     K, e, w, T, P, y = guess[0], guess[1], guess[2], guess[3], guess[4], guess[5]
 
-    if not(lower[0] < K < upper[0] and lower[1] <= e < upper[1] and lower[2] <= w < upper[2] and
-            JD_median-0.5*guess[4] < T < JD_median+0.5*guess[4] and lower[4] < P < upper[4] and lower[5] < y < upper[5]):
+    '''
+        Check for out-of-bounds values, if a bound condition is not met,
+    the function exits with -inf. Separating the checks is messier,
+    but it means that the function exits as soon as any one value lies
+    out-of-bounds (faster), instead of checking ALL of them (slower).
+    '''
+    if lower[0] > K:
+        return -inf
+    if K > upper[0]:
         return -inf
 
+    if lower[1] > e:
+        return -inf
+    if e > upper[1]:
+        return -inf
+        
+    if lower[2] > w:
+        return -inf
+    if w > upper[2]:
+        return -inf
+    
+    if JD_median-0.5*guess[4] > T:
+        return -inf
+    if T > JD_median+0.5*guess[4]:
+        return -inf
+    
+    if lower[4] > P:
+        return -inf
+    if P > upper[4]:
+        return -inf
+    
+    if lower[5] > y:
+        return -inf
+    if y > upper[5]:
+        return -inf
+    
     return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
 
-#This function is used to aid the fitter while it is doing the 1 dimensional T fit
 def goodnessOfFit(T, parameters, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
     JD_median = median(append(JDs, JDp))
     if not JD_median-0.5*parameters[4] < T < JD_median+0.5*parameters[4]:
@@ -631,42 +656,40 @@ def goodnessOfFit(T, parameters, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): 
     return -residuals([parameters[0], parameters[1], parameters[2], T, parameters[4], parameters[5]], mass_ratio, RVp, RVs, JDp, JDs)
 
 
-def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, ndim, nwalkers, nsteps, cores):
-    import emcee
-    random = np.random.randn
-    #deprecated by lowEFit, usually...
-    #if the fit is assumed to be circular, then ndim = 4, proceed accordingly
-    if ndim == 4:
-        initial_guess = initialGuessNoE(np.delete(lower_bounds,[1,2]), np.delete(upper_bounds,[1,2]), JDp, RVp)
-        #initialize walkers 
-        position = [initial_guess + 0.1*random(ndim) for i in range(nwalkers)]
-        #walkers distributed in gaussian ball around most likely parameter values
-        #coefficients on random samples are proportional to "spread" of values
-        for i in range(nwalkers):
-            position[i][0] = initial_guess[0] + 4  *random(1) #K
-            position[i][1] = initial_guess[1] +     random(1) #T
-            position[i][2] = initial_guess[2] + 0.2*random(1) #P
-            position[i][3] = gamma            + 3  *random(1) #y
-        
-        #create the sampler object and take a walk
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, likelihood, a=2.0,
-                                        args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
-        sampler.run_mcmc(position, nsteps)
-        return sampler
+def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower, upper, ndim, nwalkers, nsteps, threads):
+    '''
+    Use an affine-invariant ensemble sampler to probe an unknown probability density function.
 
-    #otherwise, eccentric fit
-    initial_guess = initialGuess(lower_bounds, upper_bounds, JDp, RVp)
-    position = [initial_guess + 0.1*random(ndim) for i in range(nwalkers)]
-    #distribute the walkers around the values given by the initial guesser, in a 'gaussian ball'
-    for i in range(nwalkers):
-        position[i][0] = initial_guess[0] + 4  *random(1) #K
-        position[i][1] = initial_guess[1] +0.05*random(1) #e
-        position[i][2] = initial_guess[2] +     random(1) #w
-        position[i][3] = initial_guess[3] +     random(1) #T
-        position[i][4] = initial_guess[4] + 0.2*random(1) #P
-        position[i][5] = gamma            + 3  *random(1) #y
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, likelihood, a=2.0,
-                                    args=(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
+    Parameters
+    ----------
+    mass_ratio : float
+        foo
+
+    Returns
+    -------
+    sampler : emcee object
+        blah
+    '''
+    import emcee
+
+    position = np.empty ([ndim,nwalkers])
+
+    # Position the walkers in regularly spaced intervals throughout the allowed space.
+    
+    # If ndim == 4, we must account for the lack of e and w.
+    if ndim == 4:
+        for i in range(ndim):
+            position[i] = np.linspace(np.delete(lower, [1,2])[i], np.delete(upper, [1,2])[i], num=nwalkers)
+    
+    else:
+        for i in range(ndim):
+            position[i] = np.linspace(lower[i], upper[i], num=nwalkers)
+
+    # Give position the correct shape.
+    position = np.transpose(position)
+
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, likelihood, a=4.0,
+                                    args=(mass_ratio, RVp, RVs, JDp, JDs, lower, upper), threads=threads)
     sampler.run_mcmc(position, nsteps)
     return sampler
 

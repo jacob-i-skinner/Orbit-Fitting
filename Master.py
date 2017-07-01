@@ -21,13 +21,13 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 JDp, JDs        = JD, JD
 samples         = 10000
 max_period      = 10
-nwalkers, nsteps= 1000, 2500 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
-cutoff          = 500
+nwalkers, nsteps= 2000, 2000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
+cutoff          = 1000
 
 #define-functions------------------------------------------------------------------------------------------------#
 
 periodogram, dataWindow, phases, wilson, maximize = f.periodogram, f.dataWindow, f.phases, f.wilson, f.maximize
-adjustment, RV, residuals, MCMC, walkers, corner, trim  = f.adjustment, f.RV, f.residuals, f.MCMC, f.walkers, f.corner, f.trim
+adjustment, RV, residuals, MCMC, walkers, corner  = f.adjustment, f.RV, f.residuals, f.MCMC, f.walkers, f.corner
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
@@ -37,11 +37,12 @@ gamma = intercept/(1+mass_ratio)
 
 fig = plt.figure(figsize=(5,5))
 ax = plt.subplot(111)
-ax.plot(RVs, RVp, 'k.')
 
 x, y = np.array([np.nanmin(RVs), np.nanmax(RVs)]),-mass_ratio*np.array([np.nanmin(RVs),np.nanmax(RVs)])+intercept
 
 ax.plot(x, y)
+ax.plot(RVs, RVp, 'k.')
+
 #ax.set_title('Wilson plot for 2M17204248+4205070')
 ax.text(30, 30, 'q = %s $\pm$ %s\n$\gamma$ = %s $\\frac{km}{s}$' %(round(mass_ratio, 3), round(standard_error, 3),
                                                      round(gamma, 3)))
@@ -84,8 +85,8 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, -0.9, -1.6, np.median(np.asarray(JD))-0.5*max_period, 3.27, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 3.3, max(max(RVs), max(RVp))]
+lower_bounds = [10, -0.9, 0, np.median(np.asarray(JD))-0.5*max_period, delta_x, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, max_period, max(max(RVs), max(RVp))]
 
 #take a walk
 print('\nwalking...')
@@ -94,7 +95,6 @@ print('Walk complete.\n')
 
 #save the results of the walk
 samples = sampler.chain[:, cutoff:, :].reshape((-1, 6))
-             
 
 #calculate the parameter values and uncertainties from the quantiles
 results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
@@ -108,11 +108,6 @@ print('Walk Plotted\n')
 
 del sampler
 
-# delete samples which lie outside of the accepted bounds
-print('trimming samples...')
-samples = trim(samples, lower_bounds, upper_bounds)
-print('Samples trimmed.\n')
-
 # Calculating values.
 print('maximizing...')
 results = np.transpose(results)
@@ -122,9 +117,15 @@ print('Maximization complete.\n')
 
 parms = np.transpose(results)[0]
 
+# Write the samples to disk.
+print('writing samples to disk...')
+np.savetxt(file + ' %s error samples.gz'%(round(residuals(parms, mass_ratio, RVp, RVs, JDp, JDs), 3)),
+        samples, delimiter=',')
+print('Samples written!\n')
+
 #create the corner plot
 print('cornering...')
-corner(6, samples, parms).savefig(file + ' %s dimension parameter results.png'%(6))
+corner(6, samples, parms).savefig(file + ' %s dimension parameter results.eps'%(6))
 plt.close()
 print('Corner plotted.\n')
 
@@ -190,37 +191,38 @@ elapsed = end-start
 print('Fitting time was ', int(elapsed), ' seconds.\n')
 
 #create the curves plot
-f = plt.figure(figsize=(12,10))
-gs = GridSpec(2,1, height_ratios = [3,1])
+f = plt.figure(figsize=(11,10))
+gs = GridSpec(2,1, height_ratios = [4,1])
 ax1 = f.add_subplot(gs[0,0])
+ax1.tick_params(labelsize=14)
 ax2 = f.add_subplot(gs[1,0])
+ax2.tick_params(labelsize=14)
 plt.subplots_adjust(wspace=0, hspace=0)
 plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
-f.suptitle('Radial Velocity Curve for ' + system, fontsize = 22)
+#f.suptitle('Radial Velocity Curve for ' + system, fontsize = 22)
 
-x = np.linspace(0, parms[4], num=1000)
+x = np.linspace(0, parms[-2], num=1000)
 primary, secondary = RV(x, mass_ratio, parms)
 
-ax1.plot(x/parms[4], primary, 'b', lw=2, label='Primary Curve')
-ax1.plot(x/parms[4], secondary, 'r', lw=2, label='Secondary Curve')
+ax1.plot(x, np.ones(len(x))*parms[-1], 'k', lw=1 , label='Systemic Velocity')
+ax1.plot(x/parms[-2], primary, 'b', lw=1, label='Primary Curve')
+ax1.plot(x/parms[-2], secondary, 'r', lw=1, label='Secondary Curve')
 
-ax1.plot(x, np.ones(len(x))*parms[4], 'k' , label='Systemic Velocity')
-
-ax1.plot(phases(parms[4], JDp), RVp, 'ks', label='Primary RV Data') #data phased to result period
-ax1.plot(phases(parms[4], JDs), RVs, 'ks', label='Secondary RV data')
+ax1.plot(phases(parms[-2], JDp), RVp, 'k.', label='Primary RV Data') #data phased to result period
+ax1.plot(phases(parms[-2], JDs), RVs, 'k.', label='Secondary RV data')
 
 # Plot the observed - computed underplot
-ax2.plot(phases(parms[4], JDp), RVp-RV(JDp, mass_ratio, parms)[0], 'bs')
-ax2.plot(phases(parms[4], JDs), RVs-RV(JDs, mass_ratio, parms)[1], 'rs')
-ax2.plot((0, 1), np.zeros(2), 'k')
+ax2.plot((0, 1), np.zeros(2), 'k', lw = 1)
+ax2.plot(phases(parms[-2], JDp), RVp-RV(JDp, mass_ratio, parms)[0], 'bo')
+ax2.plot(phases(parms[-2], JDs), RVs-RV(JDs, mass_ratio, parms)[1], 'ro')
 
 # Adjust the look of the plot
-plt.xlabel('Orbital Phase', fontsize = 18)
-ax1.set_ylabel('Radial Velocity $\\frac{km}{s}$', fontsize = 18)
-ax2.set_ylabel('O - C', fontsize = 18)
+plt.xlabel('Orbital Phase', fontsize = 20)
+ax1.set_ylabel('Radial Velocity $\\frac{km}{s}$', fontsize = 20)
+ax2.set_ylabel('O - C', fontsize = 20)
 ax1.set_xlim([0,1])
 ax2.set_xlim([0,1])
-plt.savefig(file + ' curve results.png')
+plt.savefig(file + ' curve results.eps')
 
 
 
@@ -249,11 +251,6 @@ print('Walk plotted.\n')
 
 del sampler
 
-# delete samples which lie outside of the accepted bounds
-print('trimming samples...')
-samples = trim(samples, np.delete(lower_bounds, [1,2]), np.delete(upper_bounds, [1,2]))
-print('Samples trimmed.\n')
-
 print('maximizing...')
 results = np.transpose(results)
 results[0] = maximize(samples)
@@ -262,9 +259,15 @@ print('Maximization complete.\n')
 
 parms = np.transpose(results)[0]
 
+# Write the samples to disk.
+print('writing samples to disk...')
+np.savetxt(file + ' %s error samples.gz'%(round(residuals([parms[0], 0, 0, parms[1],parms[2], parms[3]], mass_ratio, RVp, RVs, JDp, JDs), 3)),
+        samples, delimiter=',')
+print('Samples written!\n')
+
 #create the corner plot
 print('cornerning...')
-corner(4, samples, parms).savefig(file + ' %s dimension parameter results.png'%(4))
+corner(4, samples, parms).savefig(file + ' %s dimension parameter results.eps'%(4))
 plt.close()
 print('Corner plotted.\n')
 
@@ -275,16 +278,16 @@ del samples
 #for i in range(4):
 #    print(results[i][0], '+',results[i][1], '-',results[i][2])
 
-print('RMS error: ', round(residuals([results[0][0], 0, 0, results[1][0],
-                                      results[2][0], results[3][0]], mass_ratio, RVp, RVs, JDp, JDs), 3))
+print('RMS error: ', round(residuals([parms[0], 0, 0,
+                                      parms[1],parms[2], parms[3]], mass_ratio, RVp, RVs, JDp, JDs), 3))
 
 
 #write results to log file
 table = open('log.txt', 'a+')
 labels = ('K', 'T', 'P', 'y')
 print('\n' , system, " Results:", file = table)
-print('RMS error: ', residuals([results[0][0], 0, 0, results[1][0], results[2][0],
-                                results[3][0]], mass_ratio, RVp, RVs, JDp, JDs), file = table)
+print('RMS error: ', residuals([parms[0],0, 0,
+                                parms[1],parms[2], parms[3]], mass_ratio, RVp, RVs, JDp, JDs), file = table)
 print('q  = ', mass_ratio, ' +/-  ', standard_error , file = table)
 for i in range(4):
     print(labels[i], ' = ', results[i][0], ' +', results[i][1], ' -', results[i][2], file = table)
@@ -296,34 +299,35 @@ elapsed = end-start
 print('Fitting time was ', int(elapsed), ' seconds.\n')
 
 #create the curves plot
-f = plt.figure(figsize=(12,10))
-gs = GridSpec(2,1, height_ratios = [3,1])
+f = plt.figure(figsize=(11,10))
+gs = GridSpec(2,1, height_ratios = [4,1])
 ax1 = f.add_subplot(gs[0,0])
+ax1.tick_params(labelsize=14)
 ax2 = f.add_subplot(gs[1,0])
+ax2.tick_params(labelsize=14)
 plt.subplots_adjust(wspace=0, hspace=0)
 plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
-f.suptitle('Radial Velocity Curve for ' + system, fontsize = 22)
+#f.suptitle('Radial Velocity Curve for ' + system, fontsize = 22)
 
-x = np.linspace(0, parms[2], num=1000)
-primary, secondary = RV(x, mass_ratio, np.insert(np.transpose(results)[0], 1, [0,0]))
+x = np.linspace(0, parms[-2], num=1000)
+primary, secondary = RV(x, mass_ratio, [parms[0], 0, 0, parms[1], parms[2], parms[3]])
 
-ax1.plot(x/parms[2], primary, 'b', lw=2, label='Primary Curve')
-ax1.plot(x/parms[2], secondary, 'r', lw=2, label='Secondary Curve')
+ax1.plot(x, np.ones(len(x))*parms[-1], 'k', lw=1 , label='Systemic Velocity')
+ax1.plot(x/parms[-2], primary, 'b', lw=1, label='Primary Curve')
+ax1.plot(x/parms[-2], secondary, 'r', lw=1, label='Secondary Curve')
 
-ax1.plot(x, np.ones(len(x))*parms[2], 'k' , label='Systemic Velocity')
-
-ax1.plot(phases(parms[2], JDp), RVp, 'ks', label='Primary RV Data') #data phased to result period
-ax1.plot(phases(parms[2], JDs), RVs, 'ks', label='Secondary RV data')
+ax1.plot(phases(parms[-2], JDp), RVp, 'k.', label='Primary RV Data') #data phased to result period
+ax1.plot(phases(parms[-2], JDs), RVs, 'k.', label='Secondary RV data')
 
 # Plot the observed - computed underplot
-ax2.plot(phases(parms[2], JDp), RVp-RV(JDp, mass_ratio, np.insert(parms,1,[0,0]))[0], 'bs')
-ax2.plot(phases(parms[2], JDs), RVs-RV(JDs, mass_ratio, np.insert(parms,1,[0,0]))[1], 'rs')
-ax2.plot((0, 1), np.zeros(2), 'k')
+ax2.plot((0, 1), np.zeros(2), 'k', lw = 1)
+ax2.plot(phases(parms[-2], JDp), RVp-RV(JDp, mass_ratio, [parms[0], 0, 0, parms[1], parms[2], parms[3]])[0], 'bo')
+ax2.plot(phases(parms[-2], JDs), RVs-RV(JDs, mass_ratio, [parms[0], 0, 0, parms[1], parms[2], parms[3]])[1], 'ro')
 
 # Adjust the look of the plot
-plt.xlabel('Orbital Phase', fontsize = 18)
-ax1.set_ylabel('Radial Velocity $\\frac{km}{s}$', fontsize = 18)
-ax2.set_ylabel('O - C', fontsize = 18)
+plt.xlabel('Orbital Phase', fontsize = 20)
+ax1.set_ylabel('Radial Velocity $\\frac{km}{s}$', fontsize = 20)
+ax2.set_ylabel('O - C', fontsize = 20)
 ax1.set_xlim([0,1])
 ax2.set_xlim([0,1])
-plt.savefig(file + ' no e curve results.png')
+plt.savefig(file + ' no e curve results.eps')

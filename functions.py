@@ -2,6 +2,16 @@
 
 import numpy as np
 
+'''
+Defining these functions here saves a bit of time each time
+they are called because numpy does not need to be referenced.
+
+It's relevant because some of these functions are called several
+times for every call to RV, and RV is called twice for every call
+to residuals, which is run a mimimum of nwalkers*nsteps times
+during the random walk, which, as of the time of
+this writing is 4,000,000.
+'''
 pi      = np.pi
 sin     = np.sin
 cos     = np.cos
@@ -10,7 +20,10 @@ arctan  = np.arctan
 amax    = np.amax
 sqrt    = np.sqrt
 asarray = np.asarray
-
+append  = np.append
+median  = np.median
+inf     = np.inf
+insert  = np.insert
 
 def RV(x, q, parameters):
     
@@ -356,7 +369,7 @@ def residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs):
     
     Parameters
     ----------
-    parameters : ndarray(6)
+    parameters : ndarray(ndim)
         The values of the orbital elements needed to generate the RV curve.
 
     mass_ratio : float
@@ -394,6 +407,101 @@ def residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs):
     r = sqrt(p_err + s_err)
 
     return r
+
+
+def uncertainties(parameters, q, RVp, RVs, JDp, JDs):
+    '''
+    TO DO : prevent infinite loops from poor fits.
+
+    Find the distance along each axis at which error increases
+    by an arbitrary(?) factor from the minimum.
+    
+    Parameters
+    ----------
+    parameters : ndarray(ndim)
+        The values of the orbital elements needed to calculate error.
+
+    q : float
+        Ratio of secondary mass to primary mass.
+    
+    RVp : list
+        Primary observed velocities.
+
+    RVp : list
+        Secondary observed velocities.
+
+    JDp : list
+        Primary observation times.
+    
+    JDs : list
+        Secondary observation times.
+    
+    Returns
+    -------
+    values_and_uncertainties : ndarray(ndim, 3)
+        Array containing the calculated values and uncertainties.
+        example shape:
+        value0 +uncertainty0 -uncertainty0
+        value1 +uncertainty1 -uncertainty1
+    '''
+    
+    if len(parameters) == 4:
+        parameters = insert(parameters, 1, [0,0])
+    
+    # Calculate the error at the location of best fit.
+    error = residuals(parameters, q, RVp, RVs, JDp, JDs)
+    
+    # Create arrays to store the upper and lower uncertainty values.
+    high = np.empty(6)
+    low  = np.empty(6)
+    
+    # We do not want to alter parameters, so we define position.
+    position = [x for x in parameters]
+    
+    # Loop over each dimension.
+    for i in range(6):
+        
+        # One loop for upper value, one for the lower.
+        for j in range(6):
+            
+            # Initial step size, shrinks each time direction is changed.
+            if j%2 == 0:
+                step = 0.1
+            else:
+                step = -0.1
+            
+            position = [x for x in parameters]
+
+            # Iteratively zero in on the value until specified precision is reached.
+            while abs(step) > 1e-9:
+
+                # Move position along given axis until value has been passed.
+                while residuals(position, q, RVp, RVs, JDp, JDs) < error*1.2:
+                    position[i] = position[i] + step
+                
+                # Once the value has been passed, shrink the step size.
+                step = step/2
+
+                # Start heading the other way.
+                while residuals(position, q, RVp, RVs, JDp, JDs) > error*1.2:
+                    position[i] = position[i] - step
+
+                step = step/2
+            
+            # Save the values.
+            if j%2 == 0:
+                high[i] = position[i]    
+            else:
+                low[i] = position[i]
+    
+    # Rewrite the values as the differences from the best fit.
+    low, high = parameters - low, high - parameters
+
+    # Return a nicely shaped array with the zeros removed if it's circular.
+    if parameters[1] == parameters[2]:
+        return np.transpose(np.delete(np.array([parameters, high, low]), [1,2], axis=1))
+    else:
+        return np.transpose(np.array([parameters, high, low]))
 
 
 def walkers(nsteps, ndim, cutoff, sampler):
@@ -528,7 +636,7 @@ def maximize(samples):
     Returns
     -------
     maximum : list(ndim)
-        Maxima of the probability distributions along each dimensional axis.
+        Maxima of the probability distributions along each axis.
     '''
     from scipy.optimize import minimize
     from scipy.stats import gaussian_kde as kde
@@ -551,16 +659,6 @@ def maximize(samples):
 
     return maximum
 
-
-'''
-The functions below were adapted from the "fitting a model to data" example
-by Dan Foreman-Mackey, on the emcee website: http://dan.iel.fm/emcee/current/
-'''
-
-append  = np.append
-median  = np.median
-inf     = np.inf
-insert  = np.insert
 
 def likelihood(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper):
     '''
@@ -648,59 +746,80 @@ def likelihood(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper):
         return -inf
     
     return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
+    
 
-def goodnessOfFit(T, parameters, mass_ratio, RVp, RVs, JDp, JDs, lower, upper): #lnprob
-    JD_median = median(append(JDs, JDp))
-    if not JD_median-0.5*parameters[4] < T < JD_median+0.5*parameters[4]:
-        return -inf
-    return -residuals([parameters[0], parameters[1], parameters[2], T, parameters[4], parameters[5]], mass_ratio, RVp, RVs, JDp, JDs)
-
-
-def MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower, upper, ndim, nwalkers, nsteps, threads):
+def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower, upper, ndim, nwalkers, nsteps, threads):
     '''
-    Use an affine-invariant ensemble sampler to probe an unknown probability density function.
+    Use an affine-invariant ensemble sampler to probe the probability
+    density function defined by the likelihood function and the dataset.
+    likelihood and MCMC were adapted from the "fitting a model to data"
+    example by Dan Foreman-Mackey, on the emcee website: http://dan.iel.fm/emcee/current/
 
     Parameters
     ----------
     mass_ratio : float
-        foo
+        Ratio of secondary mass to primary mass.
+    
+    RVp : list
+        Primary observed velocities.
+
+    RVp : list
+        Secondary observed velocities.
+
+    JDp : list
+        Primary observation times.
+    
+    JDs : list
+        Secondary observation times.
+    
+    lower : list
+        Lower bound of allowed values.
+    
+    upper : list
+        Upper bound of allowed values.
+    
+    ndim : int
+        Number dimensions, 6 or 4.
+    
+    nwalkers : int
+        Number of walkers in the ensemble.
+
+    nsteps : int
+        Number of steps of the random walk.
+
+    threads : int
+        Number of threads to run the walk over.
 
     Returns
     -------
     sampler : emcee object
-        blah
+        The results of the random walk. Its atribute "chain"
+        is an array of size (ndim, nwalkers, nsteps) and stores
+        the paths of each walker over the walk.
+        See http://dan.iel.fm/emcee/current/api/#emcee.EnsembleSampler
+        for more details.
     '''
     import emcee
 
-    position = np.empty ([ndim,nwalkers])
-
-    # Position the walkers in regularly spaced intervals throughout the allowed space.
+    # Create an array to store the walker positions.
+    position = np.empty([ndim,nwalkers])
     
-    # If ndim == 4, we must account for the lack of e and w.
+    # Evenly space the walkers in the allowed ranges.
     if ndim == 4:
         for i in range(ndim):
             position[i] = np.linspace(np.delete(lower, [1,2])[i], np.delete(upper, [1,2])[i], num=nwalkers)
-    
     else:
         for i in range(ndim):
             position[i] = np.linspace(lower[i], upper[i], num=nwalkers)
 
-    # Give position the correct shape.
+    # Reshape position to play nice with emcee.
     position = np.transpose(position)
 
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, likelihood, a=4.0,
+    # Create the sampler object.
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, likelihood, a=8.0,
                                     args=(mass_ratio, RVp, RVs, JDp, JDs, lower, upper), threads=threads)
+    
+    # Do the run.
     sampler.run_mcmc(position, nsteps)
-    return sampler
-
-
-# currently not in use
-def lowEFit(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nwalkers, nsteps, cores, parameters):
-    import emcee
-    initial_results = parameters
-    random = np.random.randn
-    position = [initial_results[3] + random(1) for i in range(nwalkers)]
-    sampler = emcee.EnsembleSampler(nwalkers, 1, goodnessOfFit, a=4.0,
-                                    args=(parameters, mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds), threads=cores)
-    sampler.run_mcmc(position, nsteps)
+    
     return sampler

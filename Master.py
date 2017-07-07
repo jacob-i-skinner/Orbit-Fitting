@@ -28,6 +28,7 @@ cutoff          = 1000
 
 periodogram, dataWindow, phases, wilson, maximize = f.periodogram, f.dataWindow, f.phases, f.wilson, f.maximize
 adjustment, RV, residuals, MCMC, walkers, corner  = f.adjustment, f.RV, f.residuals, f.MCMC, f.walkers, f.corner
+uncertainties                                     = f.uncertainties
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
@@ -85,20 +86,19 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [10, -0.9, 0, np.median(np.asarray(JD))-0.5*max_period, delta_x, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, max_period, max(max(RVs), max(RVp))]
+lower_bounds = [10, -0.9, 0, 56048, 3.28, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.9, 2*np.pi, 56053, 3.3, max(max(RVs), max(RVp))]
+
+
+#np.median(np.asarray(JD))-0.5*max_period
 
 #take a walk
 print('\nwalking...')
-sampler = MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 6, nwalkers, nsteps, 4)
+sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 6, nwalkers, nsteps, 4)
 print('Walk complete.\n')
 
 #save the results of the walk
 samples = sampler.chain[:, cutoff:, :].reshape((-1, 6))
-
-#calculate the parameter values and uncertainties from the quantiles
-results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
-                              zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
 
 #create walkers plot
 print('plotting walk...')
@@ -108,14 +108,11 @@ print('Walk Plotted\n')
 
 del sampler
 
-# Calculating values.
+# Calculate values.
 print('maximizing...')
-results = np.transpose(results)
-results[0] = maximize(samples)
-results = np.transpose(results)
+parms = maximize(samples)
+results = uncertainties(parms, mass_ratio, RVp, RVs, JDp, JDs)
 print('Maximization complete.\n')
-
-parms = np.transpose(results)[0]
 
 # Write the samples to disk.
 print('writing samples to disk...')
@@ -130,31 +127,6 @@ plt.close()
 print('Corner plotted.\n')
 
 del samples
-
-'''
-The T- adjustment step just takes waaaayyy too long. I'm going to try just not using it for a bit. 
-If the eccentricity is low enough for it to matter, just use the circular fitter.
-
-#Adjust T
-T_sampler = lowEFit(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, nwalkers, nsteps, 4, np.transpose(results)[0])
-
-#save the results of the adjustment
-T_samples = T_sampler.chain[:, cutoff:, :].reshape((-1, 1))
-
-T_results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
-                                zip(*np.percentile(T_samples, [16, 50, 84], axis=0)))))
-
-results[3][0], results[3][1], results[3][2] = maximize(T_samples)[0], T_results[0][1], T_results[0][2]
-
-
-samples = np.transpose(samples)
-samples[3] = np.transpose(T_samples)
-samples = np.transpose(samples)
-print('T adjustment complete.')
-
-del T_sampler, T_samples
-'''
-
 
 #commented out since it was causing unnecessary issues with the interpretation of the walk. It is still valid
 #if the eccentricity is negative, perform a transformation of the parameters to make it positive
@@ -234,14 +206,11 @@ start = time.time() #start timer
 
 #take a walk
 print('walking...')
-sampler = MCMC(mass_ratio, gamma, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 4, nwalkers, nsteps, 4)
+sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 4, nwalkers, nsteps, 4)
 print('Walk complete.\n')
 
 #save the results of the walk
 samples = sampler.chain[:, cutoff:, :].reshape((-1, 4))
-
-results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
-                              zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
 
 #create the walkers plot
 print('plotting walk...')
@@ -251,17 +220,16 @@ print('Walk plotted.\n')
 
 del sampler
 
+# Calculate values.
 print('maximizing...')
-results = np.transpose(results)
-results[0] = maximize(samples)
-results = np.transpose(results)
+parms = maximize(samples)
+results = uncertainties(parms, mass_ratio, RVp, RVs, JDp, JDs)
 print('Maximization complete.\n')
-
-parms = np.transpose(results)[0]
 
 # Write the samples to disk.
 print('writing samples to disk...')
-np.savetxt(file + ' %s error samples.gz'%(round(residuals([parms[0], 0, 0, parms[1],parms[2], parms[3]], mass_ratio, RVp, RVs, JDp, JDs), 3)),
+np.savetxt(file + ' %s error samples.gz'%(round(residuals([parms[0], 0, 0, parms[1],parms[2],
+                                                           parms[3]], mass_ratio, RVp, RVs, JDp, JDs), 3)),
         samples, delimiter=',')
 print('Samples written!\n')
 

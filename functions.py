@@ -617,8 +617,8 @@ def corner(ndim, samples, parameters):
 
     # Create the figure.
     fig = corner.corner(samples, bins = 60, range = bounds, labels = labels,
-                        smooth = 1.2,truths = parameters, quantiles=[0.16, 0.84],
-                        show_titles = False, title_kwargs = {"fontsize": 18})
+                        smooth = 1.2,truths = parameters, show_titles = False,
+                        title_kwargs = {"fontsize": 18})
     return fig
 
 

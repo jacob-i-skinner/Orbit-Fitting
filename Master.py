@@ -3,8 +3,8 @@ import os, numpy as np, functions as f
 from matplotlib.gridspec import GridSpec
 from matplotlib import pyplot as plt, rcParams
 #rcParams.update({'figure.autolayout' : True})
-file     = 'Systems/1720+4205/1720+4205.txt'
-data       = np.genfromtxt(file, skip_header=1, usecols=(0,1,3))
+file     = 'Systems/0339+4531/0339+4531.tbl'
+data       = np.genfromtxt(file, skip_header=1, usecols=(1,2,3))
 system         = list(file)
 
 # the string manipulations below extract the 2MASS ID from the file name
@@ -34,21 +34,20 @@ uncertainties                                     = f.uncertainties
 
 #plot Wilson plot (mass ratio)
 mass_ratio, intercept, standard_error = wilson(data)
-gamma = intercept/(1+mass_ratio)
 
 fig = plt.figure(figsize=(5,5))
 ax = plt.subplot(111)
 
-x, y = np.array([np.nanmin(RVs), np.nanmax(RVs)]),-mass_ratio*np.array([np.nanmin(RVs),np.nanmax(RVs)])+intercept
+x, y = np.array([np.nanmin(RVs), np.nanmax(RVs)]), -mass_ratio*np.array([np.nanmin(RVs),np.nanmax(RVs)])+intercept
 
 ax.plot(x, y)
 ax.plot(RVs, RVp, 'k.')
 
 #ax.set_title('Wilson plot for 2M17204248+4205070')
-ax.text(30, 30, 'q = %s $\pm$ %s\n$\gamma$ = %s $\\frac{km}{s}$' %(round(mass_ratio, 3), round(standard_error, 3),
-                                                     round(gamma, 3)))
+ax.text(30, 30, 'q = %s $\pm$ %s' %(round(mass_ratio, 3), round(standard_error, 3)))
 ax.set_ylabel('Primary Velocity (km/s)')#, size='15')
 ax.set_xlabel('Secondary Velocity (km/s)')#, size='15')
+ax.set_title('q = %s $\pm$ %s'%(mass_ratio, standard_error))
 plt.savefig(file + ' mass ratio.png')
 #plt.show()
 
@@ -86,8 +85,8 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [10, -0.9, 0, 56048, 3.28, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.9, 2*np.pi, 56053, 3.3, max(max(RVs), max(RVp))]
+lower_bounds = [0, 0, 0, np.median(np.asarray(JD))-0.5*max_period, delta_x, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, max_period, max(max(RVs), max(RVp))]
 
 
 #np.median(np.asarray(JD))-0.5*max_period
@@ -96,6 +95,8 @@ upper_bounds = [100, 0.9, 2*np.pi, 56053, 3.3, max(max(RVs), max(RVp))]
 print('\nwalking...')
 sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 6, nwalkers, nsteps, 4)
 print('Walk complete.\n')
+
+print('Acceptance Fraction: ', np.mean(sampler.acceptance_fraction), '\n')
 
 #save the results of the walk
 samples = sampler.chain[:, cutoff:, :].reshape((-1, 6))
@@ -208,6 +209,8 @@ start = time.time() #start timer
 print('walking...')
 sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 4, nwalkers, nsteps, 4)
 print('Walk complete.\n')
+
+print('Acceptance Fraction: ', np.mean(sampler.acceptance_fraction), '\n')
 
 #save the results of the walk
 samples = sampler.chain[:, cutoff:, :].reshape((-1, 4))

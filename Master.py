@@ -3,7 +3,7 @@ import os, numpy as np, functions as f
 from matplotlib.gridspec import GridSpec
 from matplotlib import pyplot as plt, rcParams
 #rcParams.update({'figure.autolayout' : True})
-file     = 'Systems/0339+4531/0339+4531.tbl'
+file     = 'Systems/1956+2205/1956+2205.tbl'
 data       = np.genfromtxt(file, skip_header=1, usecols=(1,2,3))
 system         = list(file)
 
@@ -21,7 +21,7 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 JDp, JDs        = JD, JD
 samples         = 10000
 max_period      = 10
-nwalkers, nsteps= 2000, 2000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
+nwalkers, nsteps= 1000, 2000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
 cutoff          = 1000
 
 #define-functions------------------------------------------------------------------------------------------------#
@@ -55,7 +55,6 @@ plt.savefig(file + ' mass ratio.png')
 JDp, RVp = adjustment(JD, RVp)
 JDs, RVs = adjustment(JD, RVs)
 
-
 #calculate periodograms
 x, y, delta_x  = periodogram(JDp, RVp, samples, max_period)
 
@@ -71,6 +70,7 @@ ax.plot(x, y*y2-y3*y4, 'k', alpha = 1)
 ax.set_ylabel('Periodogram Power')#, size='15')
 ax.set_xlabel('Period (days)')#, size='15')
 ax.set_ylim(0,1)
+#ax.set_xscale('log')
 ax.set_xlim(delta_x,max_period)
 ax.set_title(system)
 plt.savefig(file + ' adjusted periodogram.png')
@@ -85,8 +85,8 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, 0, 0, np.median(np.asarray(JD))-0.5*max_period, delta_x, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, max_period, max(max(RVs), max(RVp))]
+lower_bounds = [0, -0.2, 0, np.median(np.asarray(JD))-0.5*max_period, 7.86, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 7.98, max(max(RVs), max(RVp))]
 
 
 #np.median(np.asarray(JD))-0.5*max_period
@@ -103,17 +103,22 @@ samples = sampler.chain[:, cutoff:, :].reshape((-1, 6))
 
 #create walkers plot
 print('plotting walk...')
-walkers(nsteps, 6, cutoff, sampler).savefig(file + ' %s dimension walk results.png'%(6))
+walkers(nsteps, 6, cutoff, sampler).savefig(file + ' %s dimension walk plot.png'%(6))
 plt.close()
 print('Walk Plotted\n')
 
 del sampler
 
+results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
+                               zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
+
+parms = [x for x in np.transpose(results)[0]]
+
 # Calculate values.
-print('maximizing...')
-parms = maximize(samples)
-results = uncertainties(parms, mass_ratio, RVp, RVs, JDp, JDs)
-print('Maximization complete.\n')
+#print('maximizing...')
+#parms = maximize(samples)
+#results = uncertainties(parms, mass_ratio, RVp, RVs, JDp, JDs)
+#print('Maximization complete.\n')
 
 # Write the samples to disk.
 print('writing samples to disk...')
@@ -123,7 +128,7 @@ print('Samples written!\n')
 
 #create the corner plot
 print('cornering...')
-corner(6, samples, parms).savefig(file + ' %s dimension parameter results.eps'%(6))
+corner(6, samples, parms).savefig(file + ' %s dimension corner plot.eps'%(6))
 plt.close()
 print('Corner plotted.\n')
 
@@ -198,7 +203,6 @@ ax2.set_xlim([0,1])
 plt.savefig(file + ' curve results.eps')
 
 
-
 #-------------circular---MCMC---------------#
 
 
@@ -215,19 +219,24 @@ print('Acceptance Fraction: ', np.mean(sampler.acceptance_fraction), '\n')
 #save the results of the walk
 samples = sampler.chain[:, cutoff:, :].reshape((-1, 4))
 
+results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
+                               zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
+
+parms = [x for x in np.transpose(results)[0]]
+
 #create the walkers plot
 print('plotting walk...')
-walkers(nsteps, 4, cutoff, sampler).savefig(file + ' %s dimension walk results.png'%(4))
+walkers(nsteps, 4, cutoff, sampler).savefig(file + ' %s dimension walk plot.png'%(4))
 plt.close()
 print('Walk plotted.\n')
 
 del sampler
 
 # Calculate values.
-print('maximizing...')
-parms = maximize(samples)
-results = uncertainties(parms, mass_ratio, RVp, RVs, JDp, JDs)
-print('Maximization complete.\n')
+#print('maximizing...')
+#parms = maximize(samples)
+#results = uncertainties(parms, mass_ratio, RVp, RVs, JDp, JDs)
+#print('Maximization complete.\n')
 
 # Write the samples to disk.
 print('writing samples to disk...')
@@ -238,7 +247,7 @@ print('Samples written!\n')
 
 #create the corner plot
 print('cornerning...')
-corner(4, samples, parms).savefig(file + ' %s dimension parameter results.eps'%(4))
+corner(4, samples, parms).savefig(file + ' %s dimension corner plot.eps'%(4))
 plt.close()
 print('Corner plotted.\n')
 

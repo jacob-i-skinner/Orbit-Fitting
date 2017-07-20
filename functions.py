@@ -1,5 +1,4 @@
 # Support functions for the fitting scripts in orbit-fitting.
-
 import numpy as np
 
 '''
@@ -7,10 +6,10 @@ Defining these functions here saves a bit of time each time
 they are called because numpy does not need to be referenced.
 
 It's relevant because some of these functions are called several
-times for every call to RV, and RV is called twice for every call
-to residuals, which is run a mimimum of nwalkers*nsteps times
+times for every call to RV, and RV is called twice for every calculation
+of the likelihood, which is run a mimimum of nwalkers*nsteps times
 during the random walk, which, as of the time of
-this writing is 4,000,000.
+this writing is 1-4 millions.
 '''
 pi      = np.pi
 sin     = np.sin
@@ -616,9 +615,9 @@ def corner(ndim, samples, parameters):
         labels = ["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"]
 
     # Create the figure.
-    fig = corner.corner(samples, bins = 60, range = bounds, labels = labels,
-                        smooth = 1.2,truths = parameters, show_titles = False,
-                        title_kwargs = {"fontsize": 18})
+    fig = corner.corner(samples, bins = 80, range = bounds, labels = labels,
+                        smooth = 1.2,truths = parameters, show_titles = True,
+                        quantiles = [0.16, 0.84], title_kwargs = {"fontsize": 18})
     return fig
 
 
@@ -660,7 +659,7 @@ def maximize(samples):
     return maximum
 
 
-def likelihood(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper):
+def logLikelihood(guess, q, RVp, RVs, JDp, JDs, lower, upper):
     '''
     Calculate the likelihood of a set of orbital elements being
     the 'true' values. Values are negative approaching 0! emcee
@@ -671,7 +670,7 @@ def likelihood(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper):
     guess : list
         The set of parameters to be checked. 6 for eccentric, 4 for circular.
 
-    mass_ratio : float
+    q : float
         Ratio of secondary mass to primary mass.
     
     RVp : list
@@ -697,8 +696,10 @@ def likelihood(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper):
     -inf : nan
         Returned if any element of guess falls outside of bounds.
 
-    -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs) : float
-        The negative of the residual error between observed and computed.
+    log_like : float
+        Natural log of a gaussian function with an argument equal to
+        the sum of the squares of the observed - computed given the
+        guess, for each observation in the dataset.
 
     '''
     JD_median = median(append(JDs, JDp))
@@ -745,7 +746,12 @@ def likelihood(guess, mass_ratio, RVp, RVs, JDp, JDs, lower, upper):
     if y > upper[5]:
         return -inf
     
-    return -residuals(guess, mass_ratio, RVp, RVs, JDp, JDs)
+    # log_like = the log-lilekihood, -1/2 * the sum of the squares of the primary
+    # and secondary observed - computed.
+    
+    log_like = -0.5 * (sum((asarray(RVp)-RV(JDp, q, guess)[0])**2) + sum((asarray(RVs)-RV(JDs, q, guess)[1])**2))
+    #return -residuals(guess, q, RVp, RVs, JDp, JDs)
+    return log_like
     
 
 def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower, upper, ndim, nwalkers, nsteps, threads):
@@ -816,7 +822,7 @@ def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower, upper, ndim, nwalkers, nsteps, t
     position = np.transpose(position)
 
     # Create the sampler object.
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, likelihood, a=8.0,
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, logLikelihood, a=8.0,
                                     args=(mass_ratio, RVp, RVs, JDp, JDs, lower, upper), threads=threads)
     
     # Do the run.

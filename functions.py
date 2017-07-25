@@ -24,8 +24,43 @@ median  = np.median
 inf     = np.inf
 insert  = np.insert
 
-def RV(x, q, parameters):
+def massLimit(q, K, e, P):
+    '''
+    Compute the lower limit of the Primary mass.
+
+    Parameters
+    ----------
+    q : float
+        mass ratio
     
+    K : float
+        semi-amplitude
+    
+    e : float
+        eccentricity
+    
+    P : float
+        period
+    
+    Returns
+    -------
+    M : float
+        An estimate of the lower limit of the primary
+    component's mass, in terms of Solar masses.
+    '''
+    # Put K and P into SI units.
+    K, P = K*1000, P*24*3600
+
+    # Build the parts of the equation
+    A = 1/((1+q)*((1-0.3*e**2)**3))
+    B = (P*K**3)/(2*pi*6.67428e-11)
+
+    M = A*B
+
+    # Return M in terms of solar mass
+    return round(M/1.989e30, 3)
+
+def RV(x, q, parameters):
     '''
     Computes radial velocity curves from given parameters, akin
     to defining mathematical function RV(x).
@@ -573,7 +608,7 @@ def corner(ndim, samples, parameters):
     Parameters
     ----------
     ndim : int
-        The number of dimensions explored during the random walk.
+        Dimensionality of the sample, typically 6 or 4.
 
     samples : array(nsteps*nwalkers, ndim)
         A collection of coordinates resulting from the random walk.
@@ -590,9 +625,6 @@ def corner(ndim, samples, parameters):
     '''
     import corner
     from matplotlib import pyplot as plt
-
-    # unnecessary? MUST EXPLAIN
-    #truths = parameters
 
     # Rearrange samples to make dynamic bounds setting more readable.
     samples_T = np.transpose(samples)
@@ -749,9 +781,9 @@ def logLikelihood(guess, q, RVp, RVs, JDp, JDs, lower, upper):
     # log_like = the log-lilekihood, -1/2 * the sum of the squares of the primary
     # and secondary observed - computed.
     
-    log_like = -0.5 * (sum((asarray(RVp)-RV(JDp, q, guess)[0])**2) + sum((asarray(RVs)-RV(JDs, q, guess)[1])**2))
-    #return -residuals(guess, q, RVp, RVs, JDp, JDs)
-    return log_like
+    #log_like = -0.5 * (sum((asarray(RVp)-RV(JDp, q, guess)[0])**2) + sum((asarray(RVs)-RV(JDs, q, guess)[1])**2))
+    return -residuals(guess, q, RVp, RVs, JDp, JDs)
+    #return log_like
     
 
 def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower, upper, ndim, nwalkers, nsteps, threads):

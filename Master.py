@@ -3,7 +3,7 @@ import os, numpy as np, functions as f
 from matplotlib.gridspec import GridSpec
 from matplotlib import pyplot as plt, rcParams
 #rcParams.update({'figure.autolayout' : True})
-file     = 'Systems/1956+2205/1956+2205.tbl'
+file     = 'Systems/2123+4419/2123+4419.tbl'
 data       = np.genfromtxt(file, skip_header=1, usecols=(1,2,3))
 system         = list(file)
 
@@ -20,7 +20,7 @@ system = ''.join(system)
 JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [datum[2] for datum in data]
 JDp, JDs        = JD, JD
 samples         = 10000
-max_period      = 10
+max_period      = 15
 nwalkers, nsteps= 1000, 2000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
 cutoff          = 1000
 
@@ -28,7 +28,7 @@ cutoff          = 1000
 
 periodogram, dataWindow, phases, wilson, maximize = f.periodogram, f.dataWindow, f.phases, f.wilson, f.maximize
 adjustment, RV, residuals, MCMC, walkers, corner  = f.adjustment, f.RV, f.residuals, f.MCMC, f.walkers, f.corner
-uncertainties                                     = f.uncertainties
+uncertainties, massLimit                          = f.uncertainties, f.massLimit
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
@@ -85,8 +85,8 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, -0.2, 0, np.median(np.asarray(JD))-0.5*max_period, 7.86, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 7.98, max(max(RVs), max(RVp))]
+lower_bounds = [0, -0.2, 0, np.median(np.asarray(JD))-0.5*max_period, 8.16, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 8.18, max(max(RVs), max(RVp))]
 
 
 #np.median(np.asarray(JD))-0.5*max_period
@@ -113,6 +113,8 @@ results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                                zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
 
 parms = [x for x in np.transpose(results)[0]]
+
+print('Minimum primary mass: ', massLimit(mass_ratio, parms[0], parms[1], parms[-2]), ' Solar masses.\n')
 
 # Calculate values.
 #print('maximizing...')
@@ -147,8 +149,6 @@ del samples
 #for i in range(6):
 #    print(results[i][0], '+',results[i][1], '-',results[i][2])
 
-
-
 print('RMS error: ', round(residuals([results[0][0], results[1][0], results[2][0],
                                 results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs), 3))
 
@@ -169,15 +169,15 @@ elapsed = end-start
 print('Fitting time was ', int(elapsed), ' seconds.\n')
 
 #create the curves plot
-f = plt.figure(figsize=(11,10))
+fig = plt.figure(figsize=(11,10))
 gs = GridSpec(2,1, height_ratios = [4,1])
-ax1 = f.add_subplot(gs[0,0])
+ax1 = fig.add_subplot(gs[0,0])
 ax1.tick_params(labelsize=14)
-ax2 = f.add_subplot(gs[1,0])
+ax2 = fig.add_subplot(gs[1,0])
 ax2.tick_params(labelsize=14)
 plt.subplots_adjust(wspace=0, hspace=0)
-plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
-#f.suptitle('Radial Velocity Curve for ' + system, fontsize = 22)
+plt.setp([a.get_xticklabels() for a in fig.axes[:-1]], visible=False)
+#fig.suptitle('Radial Velocity Curve for ' + system, fontsize = 22)
 
 x = np.linspace(0, parms[-2], num=1000)
 primary, secondary = RV(x, mass_ratio, parms)
@@ -224,6 +224,8 @@ results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
 
 parms = [x for x in np.transpose(results)[0]]
 
+print('Minimum primary mass: ', massLimit(mass_ratio, parms[0], 0, parms[-2]), ' Solar masses.\n')
+
 #create the walkers plot
 print('plotting walk...')
 walkers(nsteps, 4, cutoff, sampler).savefig(file + ' %s dimension walk plot.png'%(4))
@@ -258,6 +260,7 @@ del samples
 #for i in range(4):
 #    print(results[i][0], '+',results[i][1], '-',results[i][2])
 
+
 print('RMS error: ', round(residuals([parms[0], 0, 0,
                                       parms[1],parms[2], parms[3]], mass_ratio, RVp, RVs, JDp, JDs), 3))
 
@@ -279,15 +282,15 @@ elapsed = end-start
 print('Fitting time was ', int(elapsed), ' seconds.\n')
 
 #create the curves plot
-f = plt.figure(figsize=(11,10))
+fig = plt.figure(figsize=(11,10))
 gs = GridSpec(2,1, height_ratios = [4,1])
-ax1 = f.add_subplot(gs[0,0])
+ax1 = fig.add_subplot(gs[0,0])
 ax1.tick_params(labelsize=14)
-ax2 = f.add_subplot(gs[1,0])
+ax2 = fig.add_subplot(gs[1,0])
 ax2.tick_params(labelsize=14)
 plt.subplots_adjust(wspace=0, hspace=0)
-plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
-#f.suptitle('Radial Velocity Curve for ' + system, fontsize = 22)
+plt.setp([a.get_xticklabels() for a in fig.axes[:-1]], visible=False)
+#fig.suptitle('Radial Velocity Curve for ' + system, fontsize = 22)
 
 x = np.linspace(0, parms[-2], num=1000)
 primary, secondary = RV(x, mass_ratio, [parms[0], 0, 0, parms[1], parms[2], parms[3]])

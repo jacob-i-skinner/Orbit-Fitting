@@ -3,7 +3,7 @@ import os, numpy as np, functions as f
 from matplotlib.gridspec import GridSpec
 from matplotlib import pyplot as plt, rcParams
 #rcParams.update({'figure.autolayout' : True})
-file     = 'Systems/2123+4419/2123+4419.tbl'
+file     = 'Systems/2144+4211/2144+4211.tbl'
 data       = np.genfromtxt(file, skip_header=1, usecols=(1,2,3))
 system         = list(file)
 
@@ -28,7 +28,7 @@ cutoff          = 1000
 
 periodogram, dataWindow, phases, wilson, maximize = f.periodogram, f.dataWindow, f.phases, f.wilson, f.maximize
 adjustment, RV, residuals, MCMC, walkers, corner  = f.adjustment, f.RV, f.residuals, f.MCMC, f.walkers, f.corner
-uncertainties, massLimit                          = f.uncertainties, f.massLimit
+uncertainties, massLimit, coverage                = f.uncertainties, f.massLimit, f.coverage
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
@@ -55,6 +55,8 @@ plt.savefig(file + ' mass ratio.png')
 JDp, RVp = adjustment(JD, RVp)
 JDs, RVs = adjustment(JD, RVs)
 
+print(coverage(RVp, RVs))
+
 #calculate periodograms
 x, y, delta_x  = periodogram(JDp, RVp, samples, max_period)
 
@@ -74,7 +76,7 @@ ax.set_ylim(0,1)
 ax.set_xlim(delta_x,max_period)
 ax.set_title(system)
 plt.savefig(file + ' adjusted periodogram.png')
-#plt.show()
+plt.show()
 
 plt.close('all')
 

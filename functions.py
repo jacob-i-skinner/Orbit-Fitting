@@ -60,6 +60,59 @@ def massLimit(q, K, e, P):
     # Return M in terms of solar mass
     return round(M/1.989e30, 3)
 
+
+def coverage(RVp, RVs):
+    '''
+    Calculate the velocity span covered by the data.
+    (Equation 23, Troup, et. al. 2016)
+
+    Parameters
+    ----------
+    RVp : list
+        Primary radial velocity data.
+
+    RVs : list
+        Secondary radial velocity data.
+
+    Returns
+    -------
+    V_coverage : float
+        Value between 0 and 1.
+    '''
+    # Data must be sorted.
+    RVp, RVs = sorted(RVp), sorted(RVs)
+
+    N = len(RVp)
+
+    # Create and populate the array of differences.
+    prim_diff = np.empty(N-1)
+    for i in range(0,N-1):
+        prim_diff[i] = RVp[i+1] - RVp[i]
+
+    # Sum the squares of the differences.
+    prim_sum = sum(prim_diff**2)
+
+    prim = 1 - prim_sum/(max(RVp)-min(RVp))**2
+
+    prim_cov = (N/(N-1))*prim
+    
+    # Repeat this process for the secondary.
+    N = len(RVs)
+    
+    sec_diff = np.empty(N-1)
+    for i in range(0,N-1):
+        sec_diff[i] = RVs[i+1] - RVs[i]
+    
+    sec_sum = sum(sec_diff**2)
+
+    sec = 1 - sec_sum/(max(RVs)-min(RVs))**2
+
+    sec_cov = (N/(N-1))*sec
+
+    # Average and return the two values
+    return 0.5 * (prim_cov+sec_cov)
+
+
 def RV(x, q, parameters):
     '''
     Computes radial velocity curves from given parameters, akin

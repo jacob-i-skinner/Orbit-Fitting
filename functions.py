@@ -48,11 +48,11 @@ def massLimit(q, K, e, P):
         An estimate of the lower limit of the primary
     component's mass, in terms of Solar masses.
     '''
-    # Put K and P into SI units.
+    # Convert K and P into SI units.
     K, P = K*1000, P*24*3600
 
     # Build the parts of the equation
-    A = 1/((1+q)*((1-0.3*e**2)**3))
+    A = 1/((1+q)*((1-0.25*e**2-0.46875*e**4)**3))
     B = (P*K**3)/(2*pi*6.67428e-11)
 
     M = A*B
@@ -880,6 +880,7 @@ def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower, upper, ndim, nwalkers, nsteps, t
 
     threads : int
         Number of threads to run the walk over.
+        Values other than 1 are not compatible with Windows OS.
 
     Returns
     -------

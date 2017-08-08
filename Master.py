@@ -3,7 +3,7 @@ import os, numpy as np, functions as f
 from matplotlib.gridspec import GridSpec
 from matplotlib import pyplot as plt, rcParams
 #rcParams.update({'figure.autolayout' : True})
-file     = 'Systems/2144+4211/2144+4211.tbl'
+file     = 'data/1923+3834/1923+3834.tbl'
 data       = np.genfromtxt(file, skip_header=1, usecols=(1,2,3))
 system         = list(file)
 
@@ -20,7 +20,7 @@ system = ''.join(system)
 JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [datum[2] for datum in data]
 JDp, JDs        = JD, JD
 samples         = 10000
-max_period      = 15
+max_period      = 20
 nwalkers, nsteps= 1000, 2000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
 cutoff          = 1000
 
@@ -87,8 +87,8 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, -0.2, 0, np.median(np.asarray(JD))-0.5*max_period, 8.16, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 8.18, max(max(RVs), max(RVp))]
+lower_bounds = [0, -0.2, np.pi, np.median(np.asarray(JD))-0.5*max_period, 6.52, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.9, 3*np.pi, np.median(np.asarray(JD))+0.5*max_period, 6.56, max(max(RVs), max(RVp))]
 
 
 #np.median(np.asarray(JD))-0.5*max_period

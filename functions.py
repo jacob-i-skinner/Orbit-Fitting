@@ -643,7 +643,7 @@ def walkers(nsteps, ndim, cutoff, sampler):
     # along that axis, as a function of the step number.
     for i in range(ndim):
         for j in range(len(sampler.chain[:, 0, i])):
-            ax[i].plot(linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.15)
+            ax[i].plot(linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.05)
         ax[i].set_ylabel(label[i], rotation = 0, fontsize = 18)
         ax[i].yaxis.set_label_coords(-0.06, 0.5)
     

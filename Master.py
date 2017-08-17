@@ -2,8 +2,8 @@
 import os, numpy as np, functions as f
 from matplotlib.gridspec import GridSpec
 from matplotlib import pyplot as plt, rcParams
-#rcParams.update({'figure.autolayout' : True})
-file     = 'data/1923+3834/1923+3834.tbl'
+rcParams.update({'figure.autolayout' : True})
+file     = 'data/1956+2205/1956+2205.tbl'
 data       = np.genfromtxt(file, skip_header=1, usecols=(1,2,3))
 system         = list(file)
 
@@ -21,7 +21,7 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 JDp, JDs        = JD, JD
 samples         = 10000
 max_period      = 20
-nwalkers, nsteps= 1000, 2000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
+nwalkers, nsteps= 4000, 2000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
 cutoff          = 1000
 
 #define-functions------------------------------------------------------------------------------------------------#
@@ -44,10 +44,10 @@ ax.plot(x, y)
 ax.plot(RVs, RVp, 'k.')
 
 #ax.set_title('Wilson plot for 2M17204248+4205070')
-ax.text(30, 30, 'q = %s $\pm$ %s' %(round(mass_ratio, 3), round(standard_error, 3)))
-ax.set_ylabel('Primary Velocity (km/s)')#, size='15')
-ax.set_xlabel('Secondary Velocity (km/s)')#, size='15')
-ax.set_title('q = %s $\pm$ %s'%(mass_ratio, standard_error))
+ax.text(0, 20, 'q = %s $\pm$ %s' %(round(mass_ratio, 3), round(standard_error, 3)))
+ax.set_ylabel('Primary Velocity ($\\frac{km}{s}$)')#, size='15')
+ax.set_xlabel('Secondary Velocity ($\\frac{km}{s}$)')#, size='15')
+ax.set_title('q = %s $\pm$ %s'%(round(mass_ratio, 3), round(standard_error, 3)))
 plt.savefig(file + ' mass ratio.png')
 #plt.show()
 
@@ -76,7 +76,9 @@ ax.set_ylim(0,1)
 ax.set_xlim(delta_x,max_period)
 ax.set_title(system)
 plt.savefig(file + ' adjusted periodogram.png')
-plt.show()
+#plt.show()
+
+plt.plot()
 
 plt.close('all')
 
@@ -87,9 +89,12 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, -0.2, np.pi, np.median(np.asarray(JD))-0.5*max_period, 6.52, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.9, 3*np.pi, np.median(np.asarray(JD))+0.5*max_period, 6.56, max(max(RVs), max(RVp))]
+lower_bounds = [0, 0, 0, np.median(np.asarray(JD))-0.5*max_period, delta_x, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 50, max(max(RVs), max(RVp))]
 
+
+#lower_bounds = [0, 0.003, -np.pi, np.median(np.asarray(JD))-0.5*max_period, 3.28, min(min(RVs), min(RVp))]
+#upper_bounds = [100, 0.02, np.pi, np.median(np.asarray(JD))+0.5*max_period, 3.3, max(max(RVs), max(RVp))]
 
 #np.median(np.asarray(JD))-0.5*max_period
 
@@ -243,11 +248,13 @@ del sampler
 #print('Maximization complete.\n')
 
 # Write the samples to disk.
+'''
 print('writing samples to disk...')
 np.savetxt(file + ' %s error samples.gz'%(round(residuals([parms[0], 0, 0, parms[1],parms[2],
                                                            parms[3]], mass_ratio, RVp, RVs, JDp, JDs), 3)),
         samples, delimiter=',')
 print('Samples written!\n')
+'''
 
 #create the corner plot
 print('cornerning...')

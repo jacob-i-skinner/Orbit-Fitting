@@ -684,23 +684,13 @@ def corner(ndim, samples, parameters):
 
     # Set up bounds and labels for 4 or 6 dimensional cases.
     if ndim == 4:
-        bounds = [[np.amin(samples_T[0]), np.amax(samples_T[0])],
-                  [np.amin(samples_T[1]), np.amax(samples_T[1])],
-                  [np.amin(samples_T[2]), np.amax(samples_T[2])],
-                  [np.amin(samples_T[3]), np.amax(samples_T[3])]]
         labels = ["$K$", "$T$", "$P$", "$\gamma$"]
  
     elif ndim == 6:
-        bounds = [[np.amin(samples_T[0]), np.amax(samples_T[0])],
-                  [np.amin(samples_T[1]), np.amax(samples_T[1])],
-                  [np.amin(samples_T[2]), np.amax(samples_T[2])],
-                  [np.amin(samples_T[3]), np.amax(samples_T[3])],
-                  [np.amin(samples_T[4]), np.amax(samples_T[4])],
-                  [np.amin(samples_T[5]), np.amax(samples_T[5])]]
         labels = ["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"]
 
     # Create the figure.
-    fig = corner.corner(samples, bins = 80, range = bounds, labels = labels,
+    fig = corner.corner(samples, bins = 80, labels = labels,
                         smooth = 1.2,truths = parameters, show_titles = True,
                         quantiles = [0.16, 0.84], title_kwargs = {"fontsize": 18})
     return fig
@@ -830,10 +820,16 @@ def logLikelihood(guess, q, RVp, RVs, JDp, JDs, lower, upper):
         return -inf
     if y > upper[5]:
         return -inf
+
+    # Convert sqrt(e)*sin(w) back into e for the likelihood calculation
+    #guess[1] = (rootesinw/sin(w))**2
+    
     
     # log_like = the log-lilekihood, -1/2 * the sum of the squares of the primary
     # and secondary observed - computed.
     
+    # TODO: make the choice of likelihood calculation a parameter or something.
+
     #log_like = -0.5 * (sum((asarray(RVp)-RV(JDp, q, guess)[0])**2) + sum((asarray(RVs)-RV(JDs, q, guess)[1])**2))
     return -residuals(guess, q, RVp, RVs, JDp, JDs)
     #return log_like

@@ -3,26 +3,24 @@ import os, numpy as np, functions as f
 from matplotlib.gridspec import GridSpec
 from matplotlib import pyplot as plt, rcParams
 rcParams.update({'figure.autolayout' : True})
-file     = 'data/1956+2205/1956+2205.tbl'
-data       = np.genfromtxt(file, skip_header=1, usecols=(1,2,3))
-system         = list(file)
 
-# the string manipulations below extract the 2MASS ID from the file name
-# while system[0] != '2' and system[1] != 'M':
-#    del system[0]
-while system[-1] != '.':
-    del system[-1]
-del system[-1]
-system = ''.join(system)
+# Select the file.
+file     = 'data/0611+3325/0611+3325.tbl'
+
+# Create the data variable.
+data       = np.genfromtxt(file, skip_header=1, usecols=(1,2,3))
+
+# Extract the shorthand name.
+system         = file.replace('.tbl', '')[5:14]
 
 #define-variables------------------------------------------------------------------------------------------------#
 
 JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [datum[2] for datum in data]
 JDp, JDs        = JD, JD
-samples         = 10000
-max_period      = 20
-nwalkers, nsteps= 4000, 2000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
-cutoff          = 1000
+period_samples  = 10000
+max_period      = 10
+nwalkers, nsteps= 4000, 6000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
+cutoff          = 5000
 
 #define-functions------------------------------------------------------------------------------------------------#
 
@@ -58,27 +56,26 @@ JDs, RVs = adjustment(JD, RVs)
 print(coverage(RVp, RVs))
 
 #calculate periodograms
-x, y, delta_x  = periodogram(JDp, RVp, samples, max_period)
+x, y, delta_x  = periodogram(JDp, RVp, period_samples, max_period)
 
-y2    = periodogram(JDs, RVs, samples, max_period)[1]
-y3,y4 = dataWindow(JDp, samples, max_period)[1], dataWindow(JDs, samples, max_period)[1]
+y2    = periodogram(JDs, RVs, period_samples, max_period)[1]
+y3,y4 = dataWindow(JDp, period_samples, max_period)[1], dataWindow(JDs, period_samples, max_period)[1]
+
 
 #plot periodogram - data window
 fig = plt.figure(figsize=(8,3))
 ax = plt.subplot(111)
-ax.plot(x, y*y2, 'b', alpha = 0.5)
-ax.plot(x, y3*y4, 'r', alpha = 0.5)
-ax.plot(x, y*y2-y3*y4, 'k', alpha = 1)
+#ax.plot(x, y*y2, 'b', alpha = 0.5)
+#ax.plot(x, y3*y4, 'r', alpha = 0.5)
+ax.plot(x, (y*y2-y3*y4), 'k')
 ax.set_ylabel('Periodogram Power')#, size='15')
 ax.set_xlabel('Period (days)')#, size='15')
 ax.set_ylim(0,1)
-#ax.set_xscale('log')
+ax.set_xscale('log')
 ax.set_xlim(delta_x,max_period)
 ax.set_title(system)
-plt.savefig(file + ' adjusted periodogram.png')
+plt.savefig(file + ' adjusted periodogram.eps')
 #plt.show()
-
-plt.plot()
 
 plt.close('all')
 
@@ -89,12 +86,9 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, 0, 0, np.median(np.asarray(JD))-0.5*max_period, delta_x, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 50, max(max(RVs), max(RVp))]
+lower_bounds = [0, -0.2, 0, np.median(np.asarray(JD))-0.5*max_period, 1, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 10, max(max(RVs), max(RVp))]
 
-
-#lower_bounds = [0, 0.003, -np.pi, np.median(np.asarray(JD))-0.5*max_period, 3.28, min(min(RVs), min(RVp))]
-#upper_bounds = [100, 0.02, np.pi, np.median(np.asarray(JD))+0.5*max_period, 3.3, max(max(RVs), max(RVp))]
 
 #np.median(np.asarray(JD))-0.5*max_period
 
@@ -129,11 +123,13 @@ print('Minimum primary mass: ', massLimit(mass_ratio, parms[0], parms[1], parms[
 #results = uncertainties(parms, mass_ratio, RVp, RVs, JDp, JDs)
 #print('Maximization complete.\n')
 
+
 # Write the samples to disk.
 print('writing samples to disk...')
 np.savetxt(file + ' %s error samples.gz'%(round(residuals(parms, mass_ratio, RVp, RVs, JDp, JDs), 3)),
         samples, delimiter=',')
 print('Samples written!\n')
+
 
 #create the corner plot
 print('cornering...')
@@ -211,9 +207,6 @@ plt.savefig(file + ' curve results.eps')
 
 
 #-------------circular---MCMC---------------#
-
-
-
 start = time.time() #start timer
 
 #take a walk
@@ -248,13 +241,13 @@ del sampler
 #print('Maximization complete.\n')
 
 # Write the samples to disk.
-'''
+
 print('writing samples to disk...')
 np.savetxt(file + ' %s error samples.gz'%(round(residuals([parms[0], 0, 0, parms[1],parms[2],
                                                            parms[3]], mass_ratio, RVp, RVs, JDp, JDs), 3)),
         samples, delimiter=',')
 print('Samples written!\n')
-'''
+
 
 #create the corner plot
 print('cornerning...')

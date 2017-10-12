@@ -5,10 +5,10 @@ from matplotlib import pyplot as plt, rcParams
 rcParams.update({'figure.autolayout' : True})
 
 # Select the file.
-file     = 'data/0611+3325/0611+3325.tbl'
+file     = 'data/1221+2707/1221+2707.tbl'
 
 # Create the data variable.
-data       = np.genfromtxt(file, skip_header=1, usecols=(1,2,3))
+data       = np.genfromtxt(file, skip_header=1, usecols=(0, 1, 3))
 
 # Extract the shorthand name.
 system         = file.replace('.tbl', '')[5:14]
@@ -18,9 +18,9 @@ system         = file.replace('.tbl', '')[5:14]
 JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [datum[2] for datum in data]
 JDp, JDs        = JD, JD
 period_samples  = 10000
-max_period      = 10
-nwalkers, nsteps= 4000, 6000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
-cutoff          = 5000
+max_period      = 30
+nwalkers, nsteps= 4000, 20000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
+cutoff          = 19000
 
 #define-functions------------------------------------------------------------------------------------------------#
 
@@ -72,10 +72,10 @@ ax.set_ylabel('Periodogram Power')#, size='15')
 ax.set_xlabel('Period (days)')#, size='15')
 ax.set_ylim(0,1)
 ax.set_xscale('log')
-ax.set_xlim(delta_x,max_period)
+ax.set_xlim(1,max_period)
 ax.set_title(system)
 plt.savefig(file + ' adjusted periodogram.eps')
-#plt.show()
+plt.show()
 
 plt.close('all')
 
@@ -87,7 +87,7 @@ start = time.time() #start timer
 
 #constrain parameters
 lower_bounds = [0, -0.2, 0, np.median(np.asarray(JD))-0.5*max_period, 1, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 10, max(max(RVs), max(RVp))]
+upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, max_period, max(max(RVs), max(RVp))]
 
 
 #np.median(np.asarray(JD))-0.5*max_period

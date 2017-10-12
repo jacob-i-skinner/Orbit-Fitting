@@ -59,8 +59,6 @@ def massLimit(q, K, e, P):
 
     # Return M in terms of solar mass
     return round(M/1.989e30, 3)
-
-
 def coverage(RVp, RVs):
     '''
     Calculate the velocity span covered by the data.
@@ -111,8 +109,6 @@ def coverage(RVp, RVs):
 
     # Average and return the two values
     return 0.5 * (prim_cov+sec_cov)
-
-
 def RV(x, q, parameters):
     '''
     Computes radial velocity curves from given parameters, akin
@@ -176,8 +172,6 @@ def RV(x, q, parameters):
 
     # Compute and return the final curves.
     return K*(cos(v+w) + (e*cos(w)))+y, (-K/q)*(cos(v+w) + (e*cos(w)))+y
-
-
 def periodogram(x, rv, f, max_period):
     '''
     Computes a Lomb-Scargle Periodogram of the input RV data.
@@ -231,8 +225,6 @@ def periodogram(x, rv, f, max_period):
     powers *= 2 / (len(x) * rv.std() ** 2)
 
     return periods, powers, delta_x
-
-
 def dataWindow(x, f, max_period):
     '''
     Computes a data window of the dataset. That is, a periodogram with
@@ -276,8 +268,6 @@ def dataWindow(x, f, max_period):
     powers *= 2 / len(x)
 
     return periods, powers
-
-
 def adjustment(x, rv):
     '''
     Data conditioner to remove bad data values.
@@ -308,8 +298,6 @@ def adjustment(x, rv):
         newRV = np.append(newRV, rv[np.where(np.isfinite(rv))[0][i]])
     
     return newJD, newRV
-
-
 def phases(P, times):
     '''
     Turns a list of times into a list of orbital phases with respect to P
@@ -332,8 +320,6 @@ def phases(P, times):
     # x%P gives how far into a given period x lies, dividing into P
     # normalizes the result, giving the orbital phase.
     return [(x%P)/P for x in times]
-
-
 def wilson(data):
     '''
     Calculate useful things like mass ratio and systemic velocity.
@@ -367,8 +353,6 @@ def wilson(data):
     slope, intercept, rvalue, pvalue, stderr = linregress(x,y)
     
     return -slope, intercept, stderr
-
-
 def initialGuess(lower, upper, JDp, RVp):
     '''
     Make a guess at the orbital element values.
@@ -414,8 +398,6 @@ def initialGuess(lower, upper, JDp, RVp):
         return p
 
     return curve_fit(alteredRV, JDp, np.asarray(RVp), bounds=(lower, upper))[0]
-
-
 def initialGuessNoE(lower, upper, JDp, RVp):
     '''
     Make a guess of the values of the elements, assuming it is circular.
@@ -447,8 +429,6 @@ def initialGuessNoE(lower, upper, JDp, RVp):
         return K*cos((2*pi/P)*(x-T))+y
 
     return curve_fit(alteredNoERV, JDp, np.asarray(RVp), bounds=(lower, upper))[0]
-
-
 def residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs):
     '''
     Compute the square root of the N normalized sum of the squares
@@ -494,8 +474,6 @@ def residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs):
     r = sqrt(p_err + s_err)
 
     return r
-
-
 def uncertainties(parameters, q, RVp, RVs, JDp, JDs):
     '''
     TO DO : prevent infinite loops from poor fits.
@@ -589,8 +567,6 @@ def uncertainties(parameters, q, RVp, RVs, JDp, JDs):
         return np.transpose(np.delete(np.array([parameters, high, low]), [1,2], axis=1))
     else:
         return np.transpose(np.array([parameters, high, low]))
-
-
 def walkers(nsteps, ndim, cutoff, sampler):
     '''
     Create a plot showing the path of each walker in each
@@ -648,8 +624,6 @@ def walkers(nsteps, ndim, cutoff, sampler):
         ax[i].yaxis.set_label_coords(-0.06, 0.5)
     
     return fig
-
-
 def corner(ndim, samples, parameters):
     '''
     Create a plot showing the all of the samples (after the cutoff) drawn
@@ -694,8 +668,6 @@ def corner(ndim, samples, parameters):
                         smooth = 1.2,truths = parameters, show_titles = True,
                         quantiles = [0.16, 0.84], title_kwargs = {"fontsize": 18})
     return fig
-
-
 def maximize(samples):
     '''
     Use Kernel Density Estimation to find a continuous PDF
@@ -732,8 +704,6 @@ def maximize(samples):
     maximum = minimize(PDF, p0).x
 
     return maximum
-
-
 def logLikelihood(guess, q, RVp, RVs, JDp, JDs, lower, upper):
     '''
     Calculate the likelihood of a set of orbital elements being
@@ -833,8 +803,6 @@ def logLikelihood(guess, q, RVp, RVs, JDp, JDs, lower, upper):
     #log_like = -0.5 * (sum((asarray(RVp)-RV(JDp, q, guess)[0])**2) + sum((asarray(RVs)-RV(JDs, q, guess)[1])**2))
     return -residuals(guess, q, RVp, RVs, JDp, JDs)
     #return log_like
-    
-
 def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower, upper, ndim, nwalkers, nsteps, threads):
     '''
     Use an affine-invariant ensemble sampler to probe the probability

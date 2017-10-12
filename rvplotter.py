@@ -3,7 +3,7 @@ from matplotlib.gridspec import GridSpec
 from matplotlib import pyplot as plt
 from matplotlib import rcParams
 
-file     = 'Systems/1226+2439/2M12260848+2439315.tbl'
+file     = 'data/2123+4419/2123+4419.tbl'
 data       = np.genfromtxt(file, skip_header=1, usecols=(1,2,3))
 system         = list(file)
 
@@ -27,8 +27,8 @@ JDs, RVs = adjustment(JD, RVs)
 
 #----------------------------------------------------------------------------------------------------#
 
-mass_ratio, parms = 0.992451819156,[79.1143202682, 0.709276177532,  6.34473956325,
-                                    2456817.50735,    6.26726544971, 2.69108971881]
+mass_ratio, parms = 0.904,[59.1143202682, 0,  0,
+                                    0,    24.695, -123]
 #----------------------------------------------------------------------------------------------------#
 
 f = plt.figure(figsize=(11,10))
@@ -64,5 +64,5 @@ ax1.set_xlim([0,1])
 ax2.set_xlim([0,1])
 
 
-plt.savefig('2439_RV.eps')
+#plt.savefig('2439_RV.eps')
 plt.show()

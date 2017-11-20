@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt, rcParams
 rcParams.update({'figure.autolayout' : True})
 
 # Select the file.
-file     = 'data/2144+4211/2144+4211.tbl'
+file     = 'data/1221+2707/1221+2707.tbl'
 
 # Create the data variable.
 data       = np.genfromtxt(file, skip_header=1, usecols=(1,2,3))
@@ -21,7 +21,7 @@ This script creates the periodogram/sample histogram comparison plots.
 
 JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [datum[2] for datum in data]
 JDp, JDs        = JD, JD
-max_period      = 100
+max_period      = 30
 period_samples  = 10000
 
 #define-functions------------------------------------------------------------------------------------------------#
@@ -32,7 +32,7 @@ uncertainties, massLimit, coverage                = f.uncertainties, f.massLimit
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
-samples = np.loadtxt('data/2144+4211/2144+4211.tbl 4.607 error samples.txt', delimiter=',', usecols=(2), dtype=float)
+samples = np.loadtxt('data/1221+2707/1221+2707.tbl 20.668 error samples.txt', delimiter=',', usecols=(4), dtype=float)
 
 #plot Wilson plot (mass ratio)
 mass_ratio, intercept, standard_error = wilson(data)
@@ -53,21 +53,21 @@ y3,y4 = dataWindow(JDp, period_samples, max_period)[1], dataWindow(JDs, period_s
 #ax.plot(x, y3*y4, 'r', alpha = 0.5)
 plt.figure(figsize=(8,3))
 plt.yticks([])
-plt.hist(samples, bins=200, normed=True, color='red')
-plt.plot(x, (y*y2-y3*y4)*15, 'k', lw=0.5, alpha=0.75)
+plt.hist(samples, bins='auto', normed=True, color='red')
+plt.plot(x, (y*y2-y3*y4), 'k', lw=0.5, alpha=0.75)
 plt.xlabel('Period (days)')#, size='15')
-plt.ylim(0,10)
-plt.xlim(1, 20)
+plt.ylim(0,1)
+plt.xlim(1, max_period)
 plt.ylabel('Relative Likelihood')#, size='15')
 plt.savefig(file + ' period plot.eps')
-plt.show()
+#plt.show()
 
 plt.close('all')
 
-'''
-bound = (3.29, 3.305)
 
-plt.hist(samples, bins=40000)
+bound = (25.5, 26.5)
+
+plt.hist(samples, bins=400)
 plt.xlim(bound)
 plt.show()
 
@@ -77,4 +77,3 @@ for i in range(4000000):
         num += 1
 
 print(num/4000000)
-'''

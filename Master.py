@@ -8,7 +8,7 @@ rcParams.update({'figure.autolayout' : True})
 file     = 'data/1221+2707/1221+2707.tbl'
 
 # Create the data variable.
-data       = np.genfromtxt(file, skip_header=1, usecols=(0, 1, 3))
+data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3))
 
 # Extract the shorthand name.
 system         = file.replace('.tbl', '')[5:14]
@@ -19,8 +19,8 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 JDp, JDs        = JD, JD
 period_samples  = 10000
 max_period      = 30
-nwalkers, nsteps= 4000, 20000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
-cutoff          = 19000
+nwalkers, nsteps= 4000, 2000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
+cutoff          = 1000
 
 #define-functions------------------------------------------------------------------------------------------------#
 
@@ -86,8 +86,8 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, -0.2, 0, np.median(np.asarray(JD))-0.5*max_period, 1, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, max_period, max(max(RVs), max(RVp))]
+lower_bounds = [0, -0.2, 0, np.median(np.asarray(JD))-0.5*max_period, 25.5, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 26.13, max(max(RVs), max(RVp))]
 
 
 #np.median(np.asarray(JD))-0.5*max_period

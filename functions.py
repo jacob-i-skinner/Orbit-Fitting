@@ -6,10 +6,10 @@ Defining these functions here saves a bit of time each time
 they are called because numpy does not need to be referenced.
 
 It's relevant because some of these functions are called several
-times for every call to RV, and RV is called twice for every calculation
+times for every call to RV, and RV is called once for every calculation
 of the likelihood, which is run a mimimum of nwalkers*nsteps times
 during the random walk, which, as of the time of
-this writing is 1-4 millions.
+this writing is 1-4 million.
 '''
 pi      = np.pi
 sin     = np.sin
@@ -462,9 +462,10 @@ def residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs):
 
     # Find the sum of the squares of the differences between the observed
     # vaues and those computed from the curve.
-    p_err = sum((asarray(RVp)-RV(JDp, mass_ratio, parameters)[0])**2)
+    V_prim, V_sec = RV(JDp, mass_ratio, parameters)
 
-    s_err = sum((asarray(RVs)-RV(JDs, mass_ratio, parameters)[1])**2)
+    p_err = sum((asarray(RVp)-V_prim)**2)
+    s_err = sum((asarray(RVs)-V_sec)**2)
 
     # We do not want the error to rise with the number of data points
     # so the result is divided into the number of data points.
@@ -799,10 +800,13 @@ def logLikelihood(guess, q, RVp, RVs, JDp, JDs, lower, upper):
     # and secondary observed - computed.
     
     # TODO: make the choice of likelihood calculation a parameter or something.
+    
+    # Compute the curve.
+    V_prim, V_sec = RV(JDp, q, guess)
 
-    #log_like = -0.5 * (sum((asarray(RVp)-RV(JDp, q, guess)[0])**2) + sum((asarray(RVs)-RV(JDs, q, guess)[1])**2))
-    return -residuals(guess, q, RVp, RVs, JDp, JDs)
-    #return log_like
+    log_like = -0.5 * (sum((asarray(RVp)-V_prim)**2) + sum((asarray(RVs)-V_sec)**2))
+    #return -residuals(guess, q, RVp, RVs, JDp, JDs)
+    return log_like
 def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower, upper, ndim, nwalkers, nsteps, threads):
     '''
     Use an affine-invariant ensemble sampler to probe the probability

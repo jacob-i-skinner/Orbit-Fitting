@@ -322,7 +322,8 @@ def phases(P, times):
     return [(x%P)/P for x in times]
 def wilson(data):
     '''
-    Calculate useful things like mass ratio and systemic velocity.
+    Calculate useful things like mass ratio and systemic velocity, taking
+    into account the uncertainties in both the primary and secondary velocities.
 
     Parameters
     ----------
@@ -331,28 +332,44 @@ def wilson(data):
 
     Returns
     -------
-    -slope : float
+    out.beta[0] : float
         Mass Ratio of the system. The ratio of the secondary
         component mass to the primary.
     
-    intercept : float
+    intercept[1] : float
         y-intercept of the line which fits data.
 
-    stderr : float
-        Standard error of the estimated gradient.
+    stderr[0] : float
+        Standard error of the estimated Mass Ratio.
 
     '''
-    from scipy.stats import linregress
+    import scipy.odr
     
     # Primary RVs on y.
-    y = [datum[1] for datum in data if not np.isnan(datum[1]+datum[2])]
-
+    y = [datum[1] for datum in data if not np.isnan(datum[1]+datum[3])]
+    y_err = [datum[2] for datum in data if not np.isnan(datum[1]+datum[3])]
     # Secondary RVs on x.
-    x = [datum[2] for datum in data if not np.isnan(datum[1]+datum[2])]
+    x = [datum[3] for datum in data if not np.isnan(datum[1]+datum[3])]
+    x_err = [datum[4] for datum in data if not np.isnan(datum[1]+datum[3])]
 
-    slope, intercept, rvalue, pvalue, stderr = linregress(x,y)
-    
-    return -slope, intercept, stderr
+    # "line" will be used by scipy.odr to determine the mass_ratio best fit.
+    def line(p, x):
+        q, gamma = p
+        return -q * x + gamma
+
+    # Create a model for fitting.
+    line_model = scipy.odr.Model(line)
+
+    # Create a RealData object using the data arguments.
+    model_data = scipy.odr.RealData(x, y, sx=x_err, sy=y_err)
+
+    # Set up ODR with the model and model_data.
+    odr = scipy.odr.ODR(model_data, line_model, beta0=[0.,1.])
+
+    # Run the regression.
+    out=odr.run()
+
+    return [out.beta[0], out.beta[1], out.sd_beta[0]]
 def initialGuess(lower, upper, JDp, RVp):
     '''
     Make a guess at the orbital element values.

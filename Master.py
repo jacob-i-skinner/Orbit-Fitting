@@ -5,20 +5,21 @@ from matplotlib import pyplot as plt, rcParams
 rcParams.update({'figure.autolayout' : True})
 
 # Select the file.
-file     = 'data/1221+2707/1221+2707.tbl'
+file     = 'data/1720+4205/1720+4205.tbl'
 
 # Create the data variable.
-data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3))
+data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3, 4, 5))
 
 # Extract the shorthand name.
 system         = file.replace('.tbl', '')[5:14]
 
 #define-variables------------------------------------------------------------------------------------------------#
 
-JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [datum[2] for datum in data]
+JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [datum[3] for datum in data]
+p_err, s_err    = [datum[2] for datum in data], [datum[4] for datum in data]
 JDp, JDs        = JD, JD
 period_samples  = 10000
-max_period      = 30
+max_period      = 3.29
 nwalkers, nsteps= 4000, 2000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
 cutoff          = 1000
 
@@ -34,24 +35,23 @@ uncertainties, massLimit, coverage                = f.uncertainties, f.massLimit
 mass_ratio, intercept, standard_error = wilson(data)
 
 fig = plt.figure(figsize=(5,5))
-ax = plt.subplot(111)
 
 x, y = np.array([np.nanmin(RVs), np.nanmax(RVs)]), -mass_ratio*np.array([np.nanmin(RVs),np.nanmax(RVs)])+intercept
 
-ax.plot(x, y)
-ax.plot(RVs, RVp, 'k.')
+plt.errorbar(RVs, RVp, p_err, s_err, 'k.')
+plt.plot(x, y)
 
 #ax.set_title('Wilson plot for 2M17204248+4205070')
-ax.text(0, 20, 'q = %s $\pm$ %s' %(round(mass_ratio, 3), round(standard_error, 3)))
-ax.set_ylabel('Primary Velocity ($\\frac{km}{s}$)')#, size='15')
-ax.set_xlabel('Secondary Velocity ($\\frac{km}{s}$)')#, size='15')
-ax.set_title('q = %s $\pm$ %s'%(round(mass_ratio, 3), round(standard_error, 3)))
+plt.text(0, 20, 'q = %s $\pm$ %s' %(round(mass_ratio, 3), round(standard_error, 3)))
+plt.ylabel('Primary Velocity ($\\frac{km}{s}$)')#, size='15')
+plt.xlabel('Secondary Velocity ($\\frac{km}{s}$)')#, size='15')
+plt.title('q = %s $\pm$ %s'%(round(mass_ratio, 3), round(standard_error, 3)))
 plt.savefig(file + ' mass ratio.png')
 #plt.show()
 
 #check for invalid values
-JDp, RVp = adjustment(JD, RVp)
-JDs, RVs = adjustment(JD, RVs)
+JDp, RVp, p_err = adjustment(JD, RVp, p_err)
+JDs, RVs, s_err = adjustment(JD, RVs, s_err)
 
 print(coverage(RVp, RVs))
 
@@ -64,18 +64,17 @@ y3,y4 = dataWindow(JDp, period_samples, max_period)[1], dataWindow(JDs, period_s
 
 #plot periodogram - data window
 fig = plt.figure(figsize=(8,3))
-ax = plt.subplot(111)
-#ax.plot(x, y*y2, 'b', alpha = 0.5)
-#ax.plot(x, y3*y4, 'r', alpha = 0.5)
-ax.plot(x, (y*y2-y3*y4), 'k')
-ax.set_ylabel('Periodogram Power')#, size='15')
-ax.set_xlabel('Period (days)')#, size='15')
-ax.set_ylim(0,1)
-ax.set_xscale('log')
-ax.set_xlim(1,max_period)
-ax.set_title(system)
+#plt.plot(x, y*y2, 'b', alpha = 0.5)
+#plt.plot(x, y3*y4, 'r', alpha = 0.5)
+plt.plot(x, (y*y2-y3*y4), 'k')
+plt.ylabel('Periodogram Power')#, size='15')
+plt.xlabel('Period (days)')#, size='15')
+plt.ylim(0,1)
+plt.xscale('log')
+plt.xlim(1,max_period)
+plt.title(system)
 plt.savefig(file + ' adjusted periodogram.eps')
-plt.show()
+#plt.show()
 
 plt.close('all')
 
@@ -86,15 +85,15 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, -0.2, 0, np.median(np.asarray(JD))-0.5*max_period, 25.5, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.9, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 26.13, max(max(RVs), max(RVp))]
+lower_bounds = [0, 0, 0, np.median(np.asarray(JD))-0.5*max_period, 3.286, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.02, 0, np.median(np.asarray(JD))+0.5*max_period, 3.287, max(max(RVs), max(RVp))]
 
 
 #np.median(np.asarray(JD))-0.5*max_period
 
 #take a walk
 print('\nwalking...')
-sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 6, nwalkers, nsteps, 4)
+sampler = MCMC(mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower_bounds, upper_bounds, 6, nwalkers, nsteps, 4)
 print('Walk complete.\n')
 
 print('Acceptance Fraction: ', np.mean(sampler.acceptance_fraction), '\n')
@@ -189,8 +188,8 @@ ax1.plot(x, np.ones(len(x))*parms[-1], 'k', lw=1 , label='Systemic Velocity')
 ax1.plot(x/parms[-2], primary, 'b', lw=1, label='Primary Curve')
 ax1.plot(x/parms[-2], secondary, 'r', lw=1, label='Secondary Curve')
 
-ax1.plot(phases(parms[-2], JDp), RVp, 'k.', label='Primary RV Data') #data phased to result period
-ax1.plot(phases(parms[-2], JDs), RVs, 'k.', label='Secondary RV data')
+ax1.errorbar(phases(parms[-2], JDp), RVp, p_err, np.zeros(len(JDp)), 'k.', label='Primary RV Data') #data phased to result period
+ax1.errorbar(phases(parms[-2], JDs), RVs, s_err, np.zeros(len(JDs)), 'k.', label='Secondary RV data')
 
 # Plot the observed - computed underplot
 ax2.plot((0, 1), np.zeros(2), 'k', lw = 1)
@@ -205,7 +204,7 @@ ax1.set_xlim([0,1])
 ax2.set_xlim([0,1])
 plt.savefig(file + ' curve results.eps')
 
-
+'''
 #-------------circular---MCMC---------------#
 start = time.time() #start timer
 
@@ -316,3 +315,4 @@ ax2.set_ylabel('O - C', fontsize = 20)
 ax1.set_xlim([0,1])
 ax2.set_xlim([0,1])
 plt.savefig(file + ' no e curve results.eps')
+'''

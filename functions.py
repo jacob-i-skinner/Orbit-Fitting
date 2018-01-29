@@ -268,7 +268,7 @@ def dataWindow(x, f, max_period):
     powers *= 2 / len(x)
 
     return periods, powers
-def adjustment(x, rv):
+def adjustment(x, rv, err):
     '''
     Data conditioner to remove bad data values.
 
@@ -280,24 +280,31 @@ def adjustment(x, rv):
     rv : list
         Observed radial velocities.
     
+    err : list
+        Uncertainty in rv.
+
     Returns
     -------
     newJD : list
-        Adjusted times. Times with bad RVs have been removed.
+        Adjusted times. Epochs with bad RVs have been removed.
 
     newRV : list
-        List of observations with bad RVs removed.
+        Adjusted RVs. List of observations with bad RVs removed.
+    
+    newErr : list
+        Adjusted errors. Epochs with bad RVs have been removed.
     
     '''
-    newJD, newRV = np.array([]), np.array([])
+    newJD, newRV, newErr = np.array([]), np.array([]), np.array([])
 
     # If there is an element of RV marked to ignore, remove the
     # element and the same element from JD as well.
     for i in range(len(np.where(np.isfinite(rv))[0])):
         newJD = np.append(newJD, x[np.where(np.isfinite(rv))[0][i]])
         newRV = np.append(newRV, rv[np.where(np.isfinite(rv))[0][i]])
+        newErr= np.append(newErr, err[np.where(np.isfinite(rv))[0][i]])
     
-    return newJD, newRV
+    return newJD, newRV, newErr
 def phases(P, times):
     '''
     Turns a list of times into a list of orbital phases with respect to P
@@ -722,7 +729,7 @@ def maximize(samples):
     maximum = minimize(PDF, p0).x
 
     return maximum
-def logLikelihood(guess, q, RVp, RVs, JDp, JDs, lower, upper):
+def logLikelihood(guess, q, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper):
     '''
     Calculate the likelihood of a set of orbital elements being
     the 'true' values. Values are negative approaching 0! emcee
@@ -813,18 +820,17 @@ def logLikelihood(guess, q, RVp, RVs, JDp, JDs, lower, upper):
     #guess[1] = (rootesinw/sin(w))**2
     
     
-    # log_like = the log-lilekihood, -1/2 * the sum of the squares of the primary
-    # and secondary observed - computed.
+    # log_like = the log-lilekihood, -1/2 * the sum of [(observed-computed)^2]/uncertainty.
     
     # TODO: make the choice of likelihood calculation a parameter or something.
     
     # Compute the curve.
     V_prim, V_sec = RV(JDp, q, guess)
 
-    log_like = -0.5 * (sum((asarray(RVp)-V_prim)**2) + sum((asarray(RVs)-V_sec)**2))
+    log_like = -0.5 * (sum(((asarray(RVp)-V_prim)**2)/p_err) + sum(((asarray(RVs)-V_sec)**2)/s_err))
     #return -residuals(guess, q, RVp, RVs, JDp, JDs)
     return log_like
-def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower, upper, ndim, nwalkers, nsteps, threads):
+def MCMC(mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper, ndim, nwalkers, nsteps, threads):
     '''
     Use an affine-invariant ensemble sampler to probe the probability
     density function defined by the likelihood function and the dataset.
@@ -893,8 +899,8 @@ def MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower, upper, ndim, nwalkers, nsteps, t
     position = np.transpose(position)
 
     # Create the sampler object.
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, logLikelihood, a=8.0,
-                                    args=(mass_ratio, RVp, RVs, JDp, JDs, lower, upper), threads=threads)
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, logLikelihood, a=4.0,
+                                    args=(mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper), threads=threads)
     
     # Do the run.
     sampler.run_mcmc(position, nsteps)

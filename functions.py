@@ -298,12 +298,12 @@ def adjustment(x, rv, err):
     newJD, newRV, newErr = np.array([]), np.array([]), np.array([])
 
     # If there is an element of RV marked to ignore, remove the
-    # element and the same element from JD as well.
+    # element and the same element from JD and err as well.
     for i in range(len(np.where(np.isfinite(rv))[0])):
         newJD = np.append(newJD, x[np.where(np.isfinite(rv))[0][i]])
         newRV = np.append(newRV, rv[np.where(np.isfinite(rv))[0][i]])
         newErr= np.append(newErr, err[np.where(np.isfinite(rv))[0][i]])
-    
+
     return newJD, newRV, newErr
 def phases(P, times):
     '''
@@ -484,9 +484,8 @@ def residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs):
         Total residual error.
     '''
 
-    # Find the sum of the squares of the differences between the observed
-    # vaues and those computed from the curve.
-    V_prim, V_sec = RV(JDp, mass_ratio, parameters)
+    # Compute the curves.
+    V_prim, V_sec = RV(JDp, mass_ratio, parameters)[0], RV(JDs, mass_ratio, parameters)[1]
 
     p_err = sum((asarray(RVp)-V_prim)**2)
     s_err = sum((asarray(RVs)-V_sec)**2)
@@ -688,11 +687,54 @@ def corner(ndim, samples, parameters):
     elif ndim == 6:
         labels = ["$K$", "$e$", "$\omega$", "$T$", "$P$", "$\gamma$"]
 
+    # Format T to be shorter!
+    if samples.shape[1] == 6:
+        parameters[3] = parameters[3] - 2456000
+        for i in range(samples.shape[0]):
+            samples[i][3] = samples[i][3] - 2456000
+    else:
+        parameters[1] = parameters[1] - 2456000
+        for i in range(samples.shape[0]):
+            samples[i][1] = samples[i][1] - 2456000
+
     # Create the figure.
     fig = corner.corner(samples, bins = 80, labels = labels,
-                        smooth = 1.2,truths = parameters, show_titles = True,
-                        quantiles = [0.16, 0.84], title_kwargs = {"fontsize": 18})
+                        smooth = 1.2, truths = parameters,
+                        show_titles = False, title_kwargs = {"fontsize": 18})
+    
+    # This is a poorly coded placeholder to undo the change to parameters.
+    if samples.shape[1] == 6:
+        parameters[3] = parameters[3] + 2456000
+    else:
+        parameters[1] = parameters[1] + 2456000
+
     return fig
+def transform(samples):
+    '''
+    Transform samples with e < 0 to the equivalent e < 0
+    coordinate in likelihood space.
+
+    Parameters
+    ----------
+    samples : array(nsteps*nwalkers, ndim)
+        A collection of coordinates resulting from the random walk.
+    
+    Returns
+    -------
+    samples : array(nsteps*nwalkers, ndim)
+        A collection of coordinates resulting from the random walk, but
+        containing no values with e < 0.
+    '''
+
+    pi = np.pi
+
+    for i in range(samples.shape[0]):
+        if samples[i][1] < 0:
+            samples[i][1] = -samples[i][1]
+            samples[i][2] = samples[i][2] - np.pi
+            samples[i][3] = samples[i][3] - samples[i][4]/2
+    
+    return samples
 def maximize(samples):
     '''
     Use Kernel Density Estimation to find a continuous PDF
@@ -816,18 +858,21 @@ def logLikelihood(guess, q, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper):
     if y > upper[5]:
         return -inf
 
+    # Try using this slightly different model
     # Convert sqrt(e)*sin(w) back into e for the likelihood calculation
-    #guess[1] = (rootesinw/sin(w))**2
+    # guess[1] = (rootesinw/sin(w))**2
     
     
     # log_like = the log-lilekihood, -1/2 * the sum of [(observed-computed)^2]/uncertainty.
     
-    # TODO: make the choice of likelihood calculation a parameter or something.
+    # TODO(?): make the choice of likelihood calculation a parameter or something.
     
-    # Compute the curve.
-    V_prim, V_sec = RV(JDp, q, guess)
+    
+    # Compute the primary and secondary curves at the observation times corresponding to
+    # the actual observations.
+    V_prim, V_sec = RV(JDp, q, guess)[0], RV(JDs, q, guess)[1]
 
-    log_like = -0.5 * (sum(((asarray(RVp)-V_prim)**2)/p_err) + sum(((asarray(RVs)-V_sec)**2)/s_err))
+    log_like = -0.5 * (sum(((RVp-V_prim)**2)/p_err) + sum(((RVs-V_sec)**2)/s_err))
     #return -residuals(guess, q, RVp, RVs, JDp, JDs)
     return log_like
 def MCMC(mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper, ndim, nwalkers, nsteps, threads):

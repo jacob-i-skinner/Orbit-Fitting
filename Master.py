@@ -2,7 +2,7 @@
 import os, numpy as np, functions as f
 from matplotlib.gridspec import GridSpec
 from matplotlib import pyplot as plt, rcParams
-rcParams.update({'figure.autolayout' : True})
+#rcParams.update({'figure.autolayout' : True})
 
 # Select the file.
 file     = 'data/1720+4205/1720+4205.tbl'
@@ -19,7 +19,7 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 p_err, s_err    = [datum[2] for datum in data], [datum[4] for datum in data]
 JDp, JDs        = JD, JD
 period_samples  = 10000
-max_period      = 3.29
+max_period      = 3.287
 nwalkers, nsteps= 4000, 2000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
 cutoff          = 1000
 
@@ -27,7 +27,7 @@ cutoff          = 1000
 
 periodogram, dataWindow, phases, wilson, maximize = f.periodogram, f.dataWindow, f.phases, f.wilson, f.maximize
 adjustment, RV, residuals, MCMC, walkers, corner  = f.adjustment, f.RV, f.residuals, f.MCMC, f.walkers, f.corner
-uncertainties, massLimit, coverage                = f.uncertainties, f.massLimit, f.coverage
+uncertainties, massLimit, coverage, transform   = f.uncertainties, f.massLimit, f.coverage, f.transform
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
@@ -85,8 +85,8 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, 0, 0, np.median(np.asarray(JD))-0.5*max_period, 3.286, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.02, 0, np.median(np.asarray(JD))+0.5*max_period, 3.287, max(max(RVs), max(RVp))]
+lower_bounds = [0, -0.02, 0, np.median(np.asarray(JD))-0.5*max_period, 3.286, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.02, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 3.287, max(max(RVs), max(RVp))]
 
 
 #np.median(np.asarray(JD))-0.5*max_period
@@ -108,6 +108,8 @@ plt.close()
 print('Walk Plotted\n')
 
 del sampler
+
+samples = transform(samples)
 
 results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                                zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
@@ -170,6 +172,7 @@ end = time.time()
 elapsed = end-start
 print('Fitting time was ', int(elapsed), ' seconds.\n')
 
+
 #create the curves plot
 fig = plt.figure(figsize=(11,10))
 gs = GridSpec(2,1, height_ratios = [4,1])
@@ -186,15 +189,15 @@ primary, secondary = RV(x, mass_ratio, parms)
 
 ax1.plot(x, np.ones(len(x))*parms[-1], 'k', lw=1 , label='Systemic Velocity')
 ax1.plot(x/parms[-2], primary, 'b', lw=1, label='Primary Curve')
-ax1.plot(x/parms[-2], secondary, 'r', lw=1, label='Secondary Curve')
+ax1.plot(x/parms[-2], secondary, 'r--', lw=1, label='Secondary Curve')
 
-ax1.errorbar(phases(parms[-2], JDp), RVp, p_err, np.zeros(len(JDp)), 'k.', label='Primary RV Data') #data phased to result period
-ax1.errorbar(phases(parms[-2], JDs), RVs, s_err, np.zeros(len(JDs)), 'k.', label='Secondary RV data')
+ax1.errorbar(phases(parms[-2], JDp), RVp, p_err, np.zeros(len(JDp)), 'ko', label='Primary RV Data') #data phased to result period
+ax1.errorbar(phases(parms[-2], JDs), RVs, s_err, np.zeros(len(JDs)), 'kv', label='Secondary RV data')
 
 # Plot the observed - computed underplot
 ax2.plot((0, 1), np.zeros(2), 'k', lw = 1)
-ax2.plot(phases(parms[-2], JDp), RVp-RV(JDp, mass_ratio, parms)[0], 'bo')
-ax2.plot(phases(parms[-2], JDs), RVs-RV(JDs, mass_ratio, parms)[1], 'ro')
+ax2.errorbar(phases(parms[-2], JDp), RVp-RV(JDp, mass_ratio, parms)[0], p_err, np.zeros(len(JDp)), 'bo')
+ax2.errorbar(phases(parms[-2], JDs), RVs-RV(JDs, mass_ratio, parms)[1], s_err, np.zeros(len(JDs)), 'rv')
 
 # Adjust the look of the plot
 plt.xlabel('Orbital Phase', fontsize = 20)
@@ -204,13 +207,14 @@ ax1.set_xlim([0,1])
 ax2.set_xlim([0,1])
 plt.savefig(file + ' curve results.eps')
 
-'''
+print('BIC = %s'%(np.log(len(RVp)+len(RVs))*7 - 2*f.logLikelihood(parms, mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower_bounds, upper_bounds)))
+
 #-------------circular---MCMC---------------#
 start = time.time() #start timer
 
 #take a walk
 print('walking...')
-sampler = MCMC(mass_ratio, RVp, RVs, JDp, JDs, lower_bounds, upper_bounds, 4, nwalkers, nsteps, 4)
+sampler = MCMC(mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower_bounds, upper_bounds, 4, nwalkers, nsteps, 4)
 print('Walk complete.\n')
 
 print('Acceptance Fraction: ', np.mean(sampler.acceptance_fraction), '\n')
@@ -298,15 +302,15 @@ primary, secondary = RV(x, mass_ratio, [parms[0], 0, 0, parms[1], parms[2], parm
 
 ax1.plot(x, np.ones(len(x))*parms[-1], 'k', lw=1 , label='Systemic Velocity')
 ax1.plot(x/parms[-2], primary, 'b', lw=1, label='Primary Curve')
-ax1.plot(x/parms[-2], secondary, 'r', lw=1, label='Secondary Curve')
+ax1.plot(x/parms[-2], secondary, 'r--', lw=1, label='Secondary Curve')
 
-ax1.plot(phases(parms[-2], JDp), RVp, 'k.', label='Primary RV Data') #data phased to result period
-ax1.plot(phases(parms[-2], JDs), RVs, 'k.', label='Secondary RV data')
+ax1.errorbar(phases(parms[-2], JDp), RVp, p_err, np.zeros(len(JDp)), 'ko', label='Primary RV Data') #data phased to result period
+ax1.errorbar(phases(parms[-2], JDs), RVs, s_err, np.zeros(len(JDs)), 'kv', label='Secondary RV data')
 
 # Plot the observed - computed underplot
 ax2.plot((0, 1), np.zeros(2), 'k', lw = 1)
-ax2.plot(phases(parms[-2], JDp), RVp-RV(JDp, mass_ratio, [parms[0], 0, 0, parms[1], parms[2], parms[3]])[0], 'bo')
-ax2.plot(phases(parms[-2], JDs), RVs-RV(JDs, mass_ratio, [parms[0], 0, 0, parms[1], parms[2], parms[3]])[1], 'ro')
+ax2.errorbar(phases(parms[-2], JDp), RVp-RV(JDp, mass_ratio, np.insert(parms, 1, [0,0]))[0], p_err, np.zeros(len(JDp)), 'bo')
+ax2.errorbar(phases(parms[-2], JDs), RVs-RV(JDs, mass_ratio, np.insert(parms, 1, [0,0]))[1], s_err, np.zeros(len(JDs)), 'rv')
 
 # Adjust the look of the plot
 plt.xlabel('Orbital Phase', fontsize = 20)
@@ -315,4 +319,5 @@ ax2.set_ylabel('O - C', fontsize = 20)
 ax1.set_xlim([0,1])
 ax2.set_xlim([0,1])
 plt.savefig(file + ' no e curve results.eps')
-'''
+
+print('BIC = %s'%(np.log(len(RVp)+len(RVs))*7 - 2*f.logLikelihood(parms, mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower_bounds, upper_bounds)))

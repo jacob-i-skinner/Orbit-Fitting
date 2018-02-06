@@ -67,5 +67,5 @@ ax2.set_ylabel('O - C', fontsize = 20)
 ax1.set_xlim([0,1])
 ax2.set_xlim([0,1])
 
-plt.savefig('/Users/skinnej3/Desktop/poster plots/RV.png', dpi=400)
+#plt.savefig('/Users/skinnej3/Desktop/poster plots/RV.png', dpi=400)
 plt.show()

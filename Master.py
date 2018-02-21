@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt, rcParams
 #rcParams.update({'figure.autolayout' : True})
 
 # Select the file.
-file     = 'data/1720+4205/1720+4205.tbl'
+file     = 'data/2144+4211/2144+4211.tbl'
 
 # Create the data variable.
 data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3, 4, 5))
@@ -19,15 +19,15 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 p_err, s_err    = [datum[2] for datum in data], [datum[4] for datum in data]
 JDp, JDs        = JD, JD
 period_samples  = 10000
-max_period      = 3.287
+max_period      = 3.32
 nwalkers, nsteps= 4000, 2000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
 cutoff          = 1000
 
 #define-functions------------------------------------------------------------------------------------------------#
 
-periodogram, dataWindow, phases, wilson, maximize = f.periodogram, f.dataWindow, f.phases, f.wilson, f.maximize
-adjustment, RV, residuals, MCMC, walkers, corner  = f.adjustment, f.RV, f.residuals, f.MCMC, f.walkers, f.corner
-uncertainties, massLimit, coverage, transform   = f.uncertainties, f.massLimit, f.coverage, f.transform
+periodogram, dataWindow, phases, wilson  = f.periodogram, f.dataWindow, f.phases, f.wilson
+adjustment, RV, residuals, MCMC, walkers = f.adjustment, f.RV, f.residuals, f.MCMC, f.walkers
+corner, massLimit, coverage, transform   = f.corner, f.massLimit, f.coverage, f.transform
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
@@ -85,8 +85,8 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, -0.02, 0, np.median(np.asarray(JD))-0.5*max_period, 3.286, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.02, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 3.287, max(max(RVs), max(RVp))]
+lower_bounds = [0, -0.1, 0, np.median(np.asarray(JD))-0.5*max_period, 3.28, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.1, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 3.32, max(max(RVs), max(RVp))]
 
 
 #np.median(np.asarray(JD))-0.5*max_period
@@ -109,7 +109,7 @@ print('Walk Plotted\n')
 
 del sampler
 
-samples = transform(samples)
+#samples = transform(samples)
 
 results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                                zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
@@ -117,13 +117,6 @@ results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
 parms = [x for x in np.transpose(results)[0]]
 
 print('Minimum primary mass: ', massLimit(mass_ratio, parms[0], parms[1], parms[-2]), ' Solar masses.\n')
-
-# Calculate values.
-#print('maximizing...')
-#parms = maximize(samples)
-#results = uncertainties(parms, mass_ratio, RVp, RVs, JDp, JDs)
-#print('Maximization complete.\n')
-
 
 # Write the samples to disk.
 print('writing samples to disk...')
@@ -236,12 +229,6 @@ plt.close()
 print('Walk plotted.\n')
 
 del sampler
-
-# Calculate values.
-#print('maximizing...')
-#parms = maximize(samples)
-#results = uncertainties(parms, mass_ratio, RVp, RVs, JDp, JDs)
-#print('Maximization complete.\n')
 
 # Write the samples to disk.
 

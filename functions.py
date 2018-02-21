@@ -711,7 +711,7 @@ def corner(ndim, samples, parameters):
     return fig
 def transform(samples):
     '''
-    Transform samples with e < 0 to the equivalent e < 0
+    Transform samples with e < 0 to the equivalent e > 0
     coordinate in likelihood space.
 
     Parameters
@@ -872,7 +872,8 @@ def logLikelihood(guess, q, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper):
     # the actual observations.
     V_prim, V_sec = RV(JDp, q, guess)[0], RV(JDs, q, guess)[1]
 
-    log_like = -0.5 * (sum(((RVp-V_prim)**2)/p_err) + sum(((RVs-V_sec)**2)/s_err))
+    log_like = -0.5 * (sum(((RVp-V_prim)**2)/p_err**2)
+                    +  sum(((RVs-V_sec)**2)/s_err**2))
     #return -residuals(guess, q, RVp, RVs, JDp, JDs)
     return log_like
 def MCMC(mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper, ndim, nwalkers, nsteps, threads):

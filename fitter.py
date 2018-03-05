@@ -124,12 +124,13 @@ np.savetxt(file + ' %s error samples.gz'%(round(residuals(parms, mass_ratio, RVp
         samples, delimiter=',')
 print('Samples written!\n')
 
-
+''' Now handled by plotter.py
 #create the corner plot
 print('cornering...')
 corner(6, samples, parms).savefig(file + ' %s dimension corner plot.eps'%(6))
 plt.close()
 print('Corner plotted.\n')
+'''
 
 del samples
 
@@ -165,7 +166,7 @@ end = time.time()
 elapsed = end-start
 print('Fitting time was ', int(elapsed), ' seconds.\n')
 
-
+''' Now handled by plotter.py
 #create the curves plot
 fig = plt.figure(figsize=(11,10))
 gs = GridSpec(2,1, height_ratios = [4,1])
@@ -199,6 +200,7 @@ ax2.set_ylabel('O - C', fontsize = 20)
 ax1.set_xlim([0,1])
 ax2.set_xlim([0,1])
 plt.savefig(file + ' curve results.eps')
+'''
 
 print('BIC = %s'%(np.log(len(RVp)+len(RVs))*7 - 2*f.logLikelihood(parms, mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower_bounds, upper_bounds)))
 
@@ -238,12 +240,13 @@ np.savetxt(file + ' %s error samples.gz'%(round(residuals([parms[0], 0, 0, parms
         samples, delimiter=',')
 print('Samples written!\n')
 
-
+''' Now handled by plotter.py
 #create the corner plot
 print('cornerning...')
 corner(4, samples, parms).savefig(file + ' %s dimension corner plot.eps'%(4))
 plt.close()
 print('Corner plotted.\n')
+'''
 
 del samples
 
@@ -273,6 +276,8 @@ end = time.time()
 elapsed = end-start
 print('Fitting time was ', int(elapsed), ' seconds.\n')
 
+
+''' Now handled by plotter.py
 #create the curves plot
 fig = plt.figure(figsize=(11,10))
 gs = GridSpec(2,1, height_ratios = [4,1])
@@ -306,5 +311,6 @@ ax2.set_ylabel('O - C', fontsize = 20)
 ax1.set_xlim([0,1])
 ax2.set_xlim([0,1])
 plt.savefig(file + ' no e curve results.eps')
+'''
 
 print('BIC = %s'%(np.log(len(RVp)+len(RVs))*7 - 2*f.logLikelihood(parms, mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower_bounds, upper_bounds)))

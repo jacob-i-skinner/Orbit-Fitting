@@ -634,9 +634,12 @@ def walkers(nsteps, ndim, cutoff, sampler):
     
     # Create the fig object.
     fig, ax = plt.subplots(ndim, 1, sharex='col')
-    plt.xlabel('Step Number (Cutoff step: %s)'%(cutoff), fontsize = 18)
-    ax[0].set_title('Walker Positions During Random Walk', fontsize = 18)
-    fig.set_figheight(20)
+    plt.xlabel('Step Number (Cutoff step: %s)'%(cutoff), fontsize = 20)
+    ax[0].set_title('Walker Positions During Random Walk', fontsize = 25)
+    if ndim == 6:
+        fig.set_figheight(20)
+    else:
+        fig.set_figheight(13.33)
     fig.set_figwidth(15)
 
     # Populate the i-th axis with lines showing each walker's location 
@@ -644,7 +647,10 @@ def walkers(nsteps, ndim, cutoff, sampler):
     for i in range(ndim):
         for j in range(len(sampler.chain[:, 0, i])):
             ax[i].plot(linspace(0, nsteps, num=nsteps), sampler.chain[j, :, i], 'k', alpha=0.05)
-        ax[i].set_ylabel(label[i], rotation = 0, fontsize = 18)
+        ax[i].set_xlim(0, nsteps)
+        ax[i].set_ylim(np.amin(sampler.chain[:, 0, i]), np.amax(sampler.chain[:, 0, i]))
+        ax[i].tick_params(direction='in')
+        ax[i].set_ylabel(label[i], rotation = 0, fontsize = 20)
         ax[i].yaxis.set_label_coords(-0.06, 0.5)
     
     return fig
@@ -699,8 +705,10 @@ def corner(ndim, samples, parameters):
 
     # Create the figure.
     fig = corner.corner(samples, bins = 80, labels = labels,
-                        smooth = 1.2, truths = parameters,
+                        smooth = 1.2, truths = parameters, quantiles=[0.16,0.84],
                         show_titles = False, title_kwargs = {"fontsize": 18})
+    
+    plt.subplots_adjust(wspace=0, hspace=0)
     
     # This is a poorly coded placeholder to undo the change to parameters.
     if samples.shape[1] == 6:

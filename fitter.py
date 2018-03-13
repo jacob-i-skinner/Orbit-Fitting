@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt, rcParams
 #rcParams.update({'figure.autolayout' : True})
 
 # Select the file.
-file     = 'data/2144+4211/2144+4211.tbl'
+file     = 'data/0611+3325/0611+3325.tbl'
 
 # Create the data variable.
 data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3, 4, 5))
@@ -19,7 +19,7 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 p_err, s_err    = [datum[2] for datum in data], [datum[4] for datum in data]
 JDp, JDs        = JD, JD
 period_samples  = 10000
-max_period      = 3.32
+max_period      = 2.64
 nwalkers, nsteps= 4000, 2000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
 cutoff          = 1000
 
@@ -85,11 +85,8 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, -0.1, 0, np.median(np.asarray(JD))-0.5*max_period, 3.28, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.1, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 3.32, max(max(RVs), max(RVp))]
-
-
-#np.median(np.asarray(JD))-0.5*max_period
+lower_bounds = [0, -0.2, 0, np.median(np.asarray(JD))-0.5*max_period, 2.62, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.2, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 2.64, max(max(RVs), max(RVp))]
 
 #take a walk
 print('\nwalking...')
@@ -99,24 +96,33 @@ print('Walk complete.\n')
 print('Acceptance Fraction: ', np.mean(sampler.acceptance_fraction), '\n')
 
 #save the results of the walk
-samples = sampler.chain[:, cutoff:, :].reshape((-1, 6))
-
-#create walkers plot
-print('plotting walk...')
-walkers(nsteps, 6, cutoff, sampler).savefig(file + ' %s dimension walk plot.png'%(6))
-plt.close()
-print('Walk Plotted\n')
-
-del sampler
-
-#samples = transform(samples)
+samples = transform(sampler.chain[:, cutoff:, :].reshape((-1, 6)))
 
 results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
                                zip(*np.percentile(samples, [16, 50, 84], axis=0)))))
 
 parms = [x for x in np.transpose(results)[0]]
 
+print('RMS error: ', round(residuals([results[0][0], results[1][0], results[2][0],
+                                results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs), 3))
+
+print('BIC = %s'%(np.log(len(RVp)+len(RVs))*7 - 2*f.logLikelihood(parms, mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower_bounds, upper_bounds)))
+
 print('Minimum primary mass: ', massLimit(mass_ratio, parms[0], parms[1], parms[-2]), ' Solar masses.\n')
+
+#create walkers plot
+print('plotting walk...')
+walkers(nsteps, 6, cutoff, sampler).savefig(file + ' %s dimension walk plot.png'%(6), bbox_inches='tight', dpi=300)
+plt.close()
+print('Walk Plotted\n')
+
+del sampler
+
+#create the corner plot
+print('cornering...')
+corner(6, samples, parms).savefig(file + ' %s dimension corner plot.eps'%(6), bbox_inches='tight')
+plt.close()
+print('Corner plotted.\n')
 
 # Write the samples to disk.
 print('writing samples to disk...')
@@ -124,31 +130,13 @@ np.savetxt(file + ' %s error samples.gz'%(round(residuals(parms, mass_ratio, RVp
         samples, delimiter=',')
 print('Samples written!\n')
 
-''' Now handled by plotter.py
-#create the corner plot
-print('cornering...')
-corner(6, samples, parms).savefig(file + ' %s dimension corner plot.eps'%(6))
-plt.close()
-print('Corner plotted.\n')
-'''
-
 del samples
-
-#commented out since it was causing unnecessary issues with the interpretation of the walk. It is still valid
-#if the eccentricity is negative, perform a transformation of the parameters to make it positive
-#add pi to longitude of periastron, and advance time of periastron by period/2
-#if results[1][0] < 0:
-#    results[1][0], results[2][0], results[3][0] = -results[1][0], results[2][0] + np.pi, results[3][0] + results[4][0]/2
-#    results[1][1], results[1][2] = results[1][2], results[1][1] #swap uncertainties of e
 
 
 #write results to console
 #print('Results:')
 #for i in range(6):
 #    print(results[i][0], '+',results[i][1], '-',results[i][2])
-
-print('RMS error: ', round(residuals([results[0][0], results[1][0], results[2][0],
-                                results[3][0], results[4][0], results[5][0]], mass_ratio, RVp, RVs, JDp, JDs), 3))
 
 
 #write results to log file
@@ -165,44 +153,6 @@ table.close()
 end = time.time()
 elapsed = end-start
 print('Fitting time was ', int(elapsed), ' seconds.\n')
-
-''' Now handled by plotter.py
-#create the curves plot
-fig = plt.figure(figsize=(11,10))
-gs = GridSpec(2,1, height_ratios = [4,1])
-ax1 = fig.add_subplot(gs[0,0])
-ax1.tick_params(labelsize=14)
-ax2 = fig.add_subplot(gs[1,0])
-ax2.tick_params(labelsize=14)
-plt.subplots_adjust(wspace=0, hspace=0)
-plt.setp([a.get_xticklabels() for a in fig.axes[:-1]], visible=False)
-#fig.suptitle('Radial Velocity Curve for ' + system, fontsize = 22)
-
-x = np.linspace(0, parms[-2], num=1000)
-primary, secondary = RV(x, mass_ratio, parms)
-
-ax1.plot(x, np.ones(len(x))*parms[-1], 'k', lw=1 , label='Systemic Velocity')
-ax1.plot(x/parms[-2], primary, 'b', lw=1, label='Primary Curve')
-ax1.plot(x/parms[-2], secondary, 'r--', lw=1, label='Secondary Curve')
-
-ax1.errorbar(phases(parms[-2], JDp), RVp, p_err, np.zeros(len(JDp)), 'ko', label='Primary RV Data') #data phased to result period
-ax1.errorbar(phases(parms[-2], JDs), RVs, s_err, np.zeros(len(JDs)), 'kv', label='Secondary RV data')
-
-# Plot the observed - computed underplot
-ax2.plot((0, 1), np.zeros(2), 'k', lw = 1)
-ax2.errorbar(phases(parms[-2], JDp), RVp-RV(JDp, mass_ratio, parms)[0], p_err, np.zeros(len(JDp)), 'bo')
-ax2.errorbar(phases(parms[-2], JDs), RVs-RV(JDs, mass_ratio, parms)[1], s_err, np.zeros(len(JDs)), 'rv')
-
-# Adjust the look of the plot
-plt.xlabel('Orbital Phase', fontsize = 20)
-ax1.set_ylabel('Radial Velocity $\\frac{km}{s}$', fontsize = 20)
-ax2.set_ylabel('O - C', fontsize = 20)
-ax1.set_xlim([0,1])
-ax2.set_xlim([0,1])
-plt.savefig(file + ' curve results.eps')
-'''
-
-print('BIC = %s'%(np.log(len(RVp)+len(RVs))*7 - 2*f.logLikelihood(parms, mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower_bounds, upper_bounds)))
 
 #-------------circular---MCMC---------------#
 start = time.time() #start timer
@@ -222,11 +172,16 @@ results = np.asarray(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
 
 parms = [x for x in np.transpose(results)[0]]
 
+print('RMS error: ', round(residuals([parms[0], 0, 0,
+                                      parms[1],parms[2], parms[3]], mass_ratio, RVp, RVs, JDp, JDs), 3))
+
+print('BIC = %s'%(np.log(len(RVp)+len(RVs))*7 - 2*f.logLikelihood(parms, mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower_bounds, upper_bounds)))
+
 print('Minimum primary mass: ', massLimit(mass_ratio, parms[0], 0, parms[-2]), ' Solar masses.\n')
 
 #create the walkers plot
 print('plotting walk...')
-walkers(nsteps, 4, cutoff, sampler).savefig(file + ' %s dimension walk plot.png'%(4))
+walkers(nsteps, 4, cutoff, sampler).savefig(file + ' %s dimension walk plot.png'%(4), bbox_inches='tight', dpi=300)
 plt.close()
 print('Walk plotted.\n')
 
@@ -234,19 +189,17 @@ del sampler
 
 # Write the samples to disk.
 
+#create the corner plot
+print('cornerning...')
+corner(4, samples, parms).savefig(file + ' %s dimension corner plot.eps'%(4), bbox_inches=tight)
+plt.close()
+print('Corner plotted.\n')
+
 print('writing samples to disk...')
 np.savetxt(file + ' %s error samples.gz'%(round(residuals([parms[0], 0, 0, parms[1],parms[2],
                                                            parms[3]], mass_ratio, RVp, RVs, JDp, JDs), 3)),
         samples, delimiter=',')
 print('Samples written!\n')
-
-''' Now handled by plotter.py
-#create the corner plot
-print('cornerning...')
-corner(4, samples, parms).savefig(file + ' %s dimension corner plot.eps'%(4))
-plt.close()
-print('Corner plotted.\n')
-'''
 
 del samples
 
@@ -254,10 +207,6 @@ del samples
 #print('Results:')
 #for i in range(4):
 #    print(results[i][0], '+',results[i][1], '-',results[i][2])
-
-
-print('RMS error: ', round(residuals([parms[0], 0, 0,
-                                      parms[1],parms[2], parms[3]], mass_ratio, RVp, RVs, JDp, JDs), 3))
 
 
 #write results to log file
@@ -275,42 +224,3 @@ table.close()
 end = time.time()
 elapsed = end-start
 print('Fitting time was ', int(elapsed), ' seconds.\n')
-
-
-''' Now handled by plotter.py
-#create the curves plot
-fig = plt.figure(figsize=(11,10))
-gs = GridSpec(2,1, height_ratios = [4,1])
-ax1 = fig.add_subplot(gs[0,0])
-ax1.tick_params(labelsize=14)
-ax2 = fig.add_subplot(gs[1,0])
-ax2.tick_params(labelsize=14)
-plt.subplots_adjust(wspace=0, hspace=0)
-plt.setp([a.get_xticklabels() for a in fig.axes[:-1]], visible=False)
-#fig.suptitle('Radial Velocity Curve for ' + system, fontsize = 22)
-
-x = np.linspace(0, parms[-2], num=1000)
-primary, secondary = RV(x, mass_ratio, [parms[0], 0, 0, parms[1], parms[2], parms[3]])
-
-ax1.plot(x, np.ones(len(x))*parms[-1], 'k', lw=1 , label='Systemic Velocity')
-ax1.plot(x/parms[-2], primary, 'b', lw=1, label='Primary Curve')
-ax1.plot(x/parms[-2], secondary, 'r--', lw=1, label='Secondary Curve')
-
-ax1.errorbar(phases(parms[-2], JDp), RVp, p_err, np.zeros(len(JDp)), 'ko', label='Primary RV Data') #data phased to result period
-ax1.errorbar(phases(parms[-2], JDs), RVs, s_err, np.zeros(len(JDs)), 'kv', label='Secondary RV data')
-
-# Plot the observed - computed underplot
-ax2.plot((0, 1), np.zeros(2), 'k', lw = 1)
-ax2.errorbar(phases(parms[-2], JDp), RVp-RV(JDp, mass_ratio, np.insert(parms, 1, [0,0]))[0], p_err, np.zeros(len(JDp)), 'bo')
-ax2.errorbar(phases(parms[-2], JDs), RVs-RV(JDs, mass_ratio, np.insert(parms, 1, [0,0]))[1], s_err, np.zeros(len(JDs)), 'rv')
-
-# Adjust the look of the plot
-plt.xlabel('Orbital Phase', fontsize = 20)
-ax1.set_ylabel('Radial Velocity $\\frac{km}{s}$', fontsize = 20)
-ax2.set_ylabel('O - C', fontsize = 20)
-ax1.set_xlim([0,1])
-ax2.set_xlim([0,1])
-plt.savefig(file + ' no e curve results.eps')
-'''
-
-print('BIC = %s'%(np.log(len(RVp)+len(RVs))*7 - 2*f.logLikelihood(parms, mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower_bounds, upper_bounds)))

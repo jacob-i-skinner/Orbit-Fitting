@@ -2,53 +2,34 @@
 import os, numpy as np, functions as f
 from matplotlib.gridspec import GridSpec
 from matplotlib import pyplot as plt, rcParams
-plt.tick_params(direction='in')
 #rcParams.update({'figure.autolayout' : True})
 
 # Select the file.
-file     = 'data/2144+4211/2144+4211.tbl'
+file    = 'data/0611+3325/0611+3325.tbl'
 
 # Create the data variable.
-data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3, 4, 5))
+data    = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3, 4, 5))
 
 # Extract the shorthand name.
-system         = file.replace('.tbl', '')[5:14]
+system  = file.replace('.tbl', '')[5:14]
 
 #define-variables------------------------------------------------------------------------------------------------#
 
 JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [datum[3] for datum in data]
 p_err, s_err    = [datum[2] for datum in data], [datum[4] for datum in data]
-JDp, RVp, p_err = adjustment(JD, RVp, p_err)
-JDs, RVs, s_err = adjustment(JD, RVs, s_err)
+JDp, RVp, p_err = f.adjustment(JD, RVp, p_err)
+JDs, RVs, s_err = f.adjustment(JD, RVs, s_err)
 
 #define-functions------------------------------------------------------------------------------------------------#
 
-periodogram, dataWindow, phases, wilson  = f.periodogram, f.dataWindow, f.phases, f.wilson
-adjustment, RV, residuals, MCMC, walkers = f.adjustment, f.RV, f.residuals, f.MCMC, f.walkers
-corner, massLimit, coverage, transform   = f.corner, f.massLimit, f.coverage, f.transform
+RV, phases = f.RV, f.phases
 
 #now-do-things!--------------------------------------------------------------------------------------------------#
 
-#constrain parameters
-lower_bounds = [0, -0.1, 0, np.median(np.asarray(JD))-0.5*max_period, 3.28, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.1, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 3.32, max(max(RVs), max(RVp))]
-
-mass_ratio = 
-parms      = [ , , ,
-               , , ]
 
 
-
-
-#create the corner plot
-print('cornering...')
-corner(6, samples, parms).savefig(file + ' %s dimension corner plot.pdf'%(6), bbox_inches='tight')
-plt.close()
-print('Corner plotted.\n')
-
-del samples
-
-
+mass_ratio = 0.839991753142
+parms      = [32.286938682, 0.00877441013032, 2.25619016327, 2456261.74921, 2.63209134054, 76.9841749931]
 
 
 #create the curves plot
@@ -59,6 +40,7 @@ ax1.tick_params(labelsize=14)
 ax2 = fig.add_subplot(gs[1,0])
 ax2.tick_params(labelsize=14)
 plt.subplots_adjust(wspace=0, hspace=0)
+plt.tick_params(direction='in')
 plt.setp([a.get_xticklabels() for a in fig.axes[:-1]], visible=False)
 #fig.suptitle('Radial Velocity Curve for ' + system, fontsize = 22)
 
@@ -84,6 +66,4 @@ ax1.set_ylabel('Radial Velocity $\\frac{km}{s}$', fontsize = 20)
 ax2.set_ylabel('O - C', fontsize = 20)
 ax1.set_xlim([0,1])
 ax2.set_xlim([0,1])
-plt.savefig(file + ' curve results.pdf', bbox_inches='tight')
-
-plt.show()
+plt.savefig(file + ' curve results.eps', bbox_inches='tight')

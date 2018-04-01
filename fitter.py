@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt, rcParams
 #rcParams.update({'figure.autolayout' : True})
 
 # Select the file.
-file     = 'data/0611+3325/0611+3325.tbl'
+file     = 'data/2144+4211/2144+4211.tbl'
 
 # Create the data variable.
 data       = np.genfromtxt(file, skip_header=1, usecols=(1, 2, 3, 4, 5))
@@ -19,7 +19,7 @@ JD, RVp, RVs    = [datum[0] for datum in data], [datum[1] for datum in data], [d
 p_err, s_err    = [datum[2] for datum in data], [datum[4] for datum in data]
 JDp, JDs        = JD, JD
 period_samples  = 10000
-max_period      = 2.64
+max_period      = 3.32
 nwalkers, nsteps= 4000, 2000 #minimum nwalker: 14, minimum nsteps determined by the convergence cutoff
 cutoff          = 1000
 
@@ -46,7 +46,7 @@ plt.text(0, 20, 'q = %s $\pm$ %s' %(round(mass_ratio, 3), round(standard_error, 
 plt.ylabel('Primary Velocity ($\\frac{km}{s}$)')#, size='15')
 plt.xlabel('Secondary Velocity ($\\frac{km}{s}$)')#, size='15')
 plt.title('q = %s $\pm$ %s'%(round(mass_ratio, 3), round(standard_error, 3)))
-plt.savefig(file + ' mass ratio.png')
+plt.savefig(file + ' mass ratio.pdf', bbox_inches='tight')
 #plt.show()
 
 #check for invalid values
@@ -73,7 +73,7 @@ plt.ylim(0,1)
 plt.xscale('log')
 plt.xlim(1,max_period)
 plt.title(system)
-plt.savefig(file + ' adjusted periodogram.eps')
+plt.savefig(file + ' adjusted periodogram.pdf', bbox_inches='tight')
 #plt.show()
 
 plt.close('all')
@@ -85,8 +85,8 @@ import time
 start = time.time() #start timer
 
 #constrain parameters
-lower_bounds = [0, -0.2, 0, np.median(np.asarray(JD))-0.5*max_period, 2.62, min(min(RVs), min(RVp))]
-upper_bounds = [100, 0.2, 2*np.pi, np.median(np.asarray(JD))+0.5*max_period, 2.64, max(max(RVs), max(RVp))]
+lower_bounds = [0, -0.1, 0, np.median(np.asarray(JD))-0.5*max_period, 3.28, min(min(RVs), min(RVp))]
+upper_bounds = [100, 0.2, 4, np.median(np.asarray(JD))+0.5*max_period, 3.32, max(max(RVs), max(RVp))]
 
 #take a walk
 print('\nwalking...')
@@ -112,7 +112,7 @@ print('Minimum primary mass: ', massLimit(mass_ratio, parms[0], parms[1], parms[
 
 #create walkers plot
 print('plotting walk...')
-walkers(nsteps, 6, cutoff, sampler).savefig(file + ' %s dimension walk plot.png'%(6), bbox_inches='tight', dpi=300)
+walkers(nsteps, 6, cutoff, sampler).savefig(file + ' 6 dimension walk plot.png', bbox_inches='tight', dpi=300)
 plt.close()
 print('Walk Plotted\n')
 
@@ -120,7 +120,7 @@ del sampler
 
 #create the corner plot
 print('cornering...')
-corner(6, samples, parms).savefig(file + ' %s dimension corner plot.eps'%(6), bbox_inches='tight')
+corner(6, samples, parms).savefig(file + ' 6 dimension corner plot.pdf', bbox_inches='tight')
 plt.close()
 print('Corner plotted.\n')
 
@@ -181,7 +181,7 @@ print('Minimum primary mass: ', massLimit(mass_ratio, parms[0], 0, parms[-2]), '
 
 #create the walkers plot
 print('plotting walk...')
-walkers(nsteps, 4, cutoff, sampler).savefig(file + ' %s dimension walk plot.png'%(4), bbox_inches='tight', dpi=300)
+walkers(nsteps, 4, cutoff, sampler).savefig(file + ' 4 dimension walk plot.png', bbox_inches='tight', dpi=300)
 plt.close()
 print('Walk plotted.\n')
 
@@ -191,7 +191,7 @@ del sampler
 
 #create the corner plot
 print('cornerning...')
-corner(4, samples, parms).savefig(file + ' %s dimension corner plot.eps'%(4), bbox_inches=tight)
+corner(4, samples, parms).savefig(file + ' 4 dimension corner plot.pdf', bbox_inches='tight')
 plt.close()
 print('Corner plotted.\n')
 

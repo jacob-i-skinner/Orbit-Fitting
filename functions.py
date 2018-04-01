@@ -487,15 +487,15 @@ def residuals(parameters, mass_ratio, RVp, RVs, JDp, JDs):
     # Compute the curves.
     V_prim, V_sec = RV(JDp, mass_ratio, parameters)[0], RV(JDs, mass_ratio, parameters)[1]
 
-    p_err = sum((asarray(RVp)-V_prim)**2)
-    s_err = sum((asarray(RVs)-V_sec)**2)
+    p_diff = sum((asarray(RVp)-V_prim)**2)
+    s_diff = sum((asarray(RVs)-V_sec)**2)
 
     # We do not want the error to rise with the number of data points
     # so the result is divided into the number of data points.
-    p_err, s_err = p_err/len(RVp), s_err/len(RVs)
+    p_diff, s_diff = p_diff/len(RVp), s_diff/len(RVs)
 
     # Find the square root of the remaining sum.
-    r = sqrt(p_err + s_err)
+    r = sqrt(p_diff + s_diff)
 
     return r
 def uncertainties(parameters, q, RVp, RVs, JDp, JDs):
@@ -705,7 +705,7 @@ def corner(ndim, samples, parameters):
 
     # Create the figure.
     fig = corner.corner(samples, bins = 80, labels = labels,
-                        smooth = 1.2, truths = parameters, quantiles=[0.16,0.84],
+                        smooth = 2.5, truths = parameters, quantiles=[0.16,0.84],
                         show_titles = False, title_kwargs = {"fontsize": 18})
     
     plt.subplots_adjust(wspace=0, hspace=0)
@@ -779,7 +779,7 @@ def maximize(samples):
     maximum = minimize(PDF, p0).x
 
     return maximum
-def logLikelihood(guess, q, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper):
+def logLikelihood(guess, q, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper, period_search=None):
     '''
     Calculate the likelihood of a set of orbital elements being
     the 'true' values. Values are negative approaching 0! emcee
@@ -810,6 +810,10 @@ def logLikelihood(guess, q, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper):
     
     upper : list
         upper bound of allowed values.
+
+    period_search : bool
+        Whether or not the current walk is a
+        period search.
 
     Returns
     -------
@@ -873,18 +877,21 @@ def logLikelihood(guess, q, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper):
     
     # log_like = the log-lilekihood, -1/2 * the sum of [(observed-computed)^2]/uncertainty.
     
-    # TODO(?): make the choice of likelihood calculation a parameter or something.
-    
     
     # Compute the primary and secondary curves at the observation times corresponding to
     # the actual observations.
     V_prim, V_sec = RV(JDp, q, guess)[0], RV(JDs, q, guess)[1]
 
+    if period_search == True:
+        log_like = -0.5 * 1/(len(RVp)+len(RVs)) * sqrt(sum(((RVp-V_prim)**2)/p_err**2)
+                                                     + sum(((RVs-V_sec)**2)/s_err**2))
+        return log_like
+    
+
     log_like = -0.5 * (sum(((RVp-V_prim)**2)/p_err**2)
                     +  sum(((RVs-V_sec)**2)/s_err**2))
-    #return -residuals(guess, q, RVp, RVs, JDp, JDs)
     return log_like
-def MCMC(mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper, ndim, nwalkers, nsteps, threads):
+def MCMC(mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper, ndim, nwalkers, nsteps, threads, period_search=None):
     '''
     Use an affine-invariant ensemble sampler to probe the probability
     density function defined by the likelihood function and the dataset.
@@ -926,6 +933,10 @@ def MCMC(mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper, ndim, nwalk
     threads : int
         Number of threads to run the walk over.
         Values other than 1 are not compatible with Windows OS.
+    
+    period_search : bool
+        Whether or not the current walk is a
+        period search. (passed to loglikelihood)
 
     Returns
     -------
@@ -954,7 +965,7 @@ def MCMC(mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper, ndim, nwalk
 
     # Create the sampler object.
     sampler = emcee.EnsembleSampler(nwalkers, ndim, logLikelihood, a=4.0,
-                                    args=(mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper), threads=threads)
+                                    args=(mass_ratio, RVp, p_err, RVs, s_err, JDp, JDs, lower, upper, period_search), threads=threads)
     
     # Do the run.
     sampler.run_mcmc(position, nsteps)

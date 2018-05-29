@@ -93,7 +93,8 @@ if not len(HET_JDp+HET_JDs) == 0:
 # Adjust the look of the plot
 plt.xlabel('Orbital Phase', fontsize = 20)
 ax1.set_ylabel('Radial Velocity $\\frac{km}{s}$', fontsize = 20)
-ax2.set_ylabel('O - C', fontsize = 20)
+ax2.set_ylabel('O - C $\\frac{km}{s}$', fontsize = 20)
 ax1.set_xlim([0,1])
 ax2.set_xlim([0,1])
-plt.savefig(file + ' curve results.pdf', bbox_inches='tight')
+plt.savefig('4211_RV.pdf', bbox_inches='tight')
+plt.show()
